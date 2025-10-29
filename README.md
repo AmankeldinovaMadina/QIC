@@ -1,0 +1,137 @@
+# Travel Aggregator with Visa Requirements
+
+A FastAPI service that aggregates hidden places from OpenTripMap & OpenStreetMap, plus visa requirement checking via RapidAPI.
+
+## Features
+
+### 🗺️ Travel Discovery
+- **Hidden Places**: Finds interesting but lesser-known places near coordinates
+- **Multiple Sources**: Combines OpenTripMap + OpenStreetMap data
+- **Smart Deduplication**: Merges nearby places to avoid duplicates
+- **Distance Sorting**: Results sorted by distance from query point
+
+### 🛂 Visa Requirements
+- **Custom Passport Ranking**: Rank passports by visa-free access with custom weights
+- **Visa Requirement Check**: Check visa requirements between countries
+- **RapidAPI Integration**: Uses professional visa requirement data
+
+## Setup
+
+1. **Install dependencies:**
+   ```bash
+   pip install fastapi uvicorn httpx python-dotenv
+   ```
+
+2. **Configure API keys in `.env`:**
+   ```env
+   OPENTRIPMAP_API_KEY=your_opentripmap_key_here
+   RAPIDAPI_KEY=your_rapidapi_key_here
+   ```
+
+3. **Run the server:**
+   ```bash
+   python app.py
+   ```
+   Server runs on http://localhost:8001
+
+## API Endpoints
+
+### Health Check
+```bash
+curl http://localhost:8001/health
+```
+
+### Discover Hidden Places
+```bash
+curl -X POST "http://localhost:8001/discover" \
+  -H "Content-Type: application/json" \
+  -d '{"lat":43.2566,"lon":76.9286,"radius_m":3000}'
+```
+
+### Visa Passport Ranking
+```bash
+curl -X POST "http://localhost:8001/visa/rank/custom" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "weights": {
+      "Visa-free": 2,
+      "Visa on arrival": 1,
+      "Visa required": 0,
+      "eVisa": 1,
+      "eTA": 1,
+      "Tourist card": 0,
+      "Freedom of movement": 3,
+      "Not admitted": -1
+    }
+  }'
+```
+
+### Check Visa Requirements
+```bash
+curl "http://localhost:8001/visa/check?passport=KZ&destination=KR"
+```
+
+## Configuration Notes
+
+### RapidAPI Setup
+1. Get your API key from [RapidAPI visa-requirement service](https://rapidapi.com/hub)
+2. Add it to `.env` as `RAPIDAPI_KEY=your_key_here`
+3. **Important**: Keep API keys server-side only, never expose in frontend code
+
+### Endpoint Customization
+The visa check endpoint path might need adjustment based on your specific RapidAPI plan. Common variations:
+- `/v2/visa/requirements` (current)
+- `/v2/passport/requirements/{from}/{to}`
+- `/v2/visa/check`
+
+Check your RapidAPI dashboard's "Endpoints" tab for the exact path and update the `get_visa_requirement` function accordingly.
+
+## Example Responses
+
+### Hidden Places
+```json
+{
+  "places": [
+    {
+      "id": "osm:641793048",
+      "name": "Казкоммерцбанк",
+      "lat": 43.2543989,
+      "lon": 76.9317289,
+      "categories": ["bank"],
+      "rating": null,
+      "distance": 352.29,
+      "source": "OpenStreetMap"
+    }
+  ]
+}
+```
+
+### Visa Check
+```json
+{
+  "passport": "KZ",
+  "destination": "KR", 
+  "result": {
+    "requirement": "Visa required",
+    "days": 0,
+    "notes": "Tourist visa required"
+  }
+}
+```
+
+## Production Notes
+
+- **Security**: Keep `RAPIDAPI_KEY` and `OPENTRIPMAP_API_KEY` in environment variables only
+- **Caching**: Consider caching visa results (rules don't change frequently)
+- **Rate Limits**: Both APIs have rate limits; implement retry logic for production use
+- **Error Handling**: 502 errors indicate upstream API issues; 500 errors are internal
+
+## File Structure
+
+```
+QIC/
+├── app.py              # Main FastAPI application
+├── requirements.txt    # Python dependencies  
+├── .env               # API keys (keep private!)
+└── README.md          # This file
+```
