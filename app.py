@@ -5,7 +5,7 @@ import uuid
 import json
 import math
 from datetime import datetime, time, timedelta, timezone
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional, Iterable
 from fastapi.responses import Response, PlainTextResponse
 
 
@@ -15,6 +15,9 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, ValidationError, field_validator
 from openai import OpenAI
+
+# Module for flight search redirection
+import url_builder 
 
 load_dotenv()
 
@@ -30,6 +33,23 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 if not OPENAI_API_KEY:
     raise RuntimeError("OPENAI_API_KEY is not set")
 client = OpenAI(api_key=OPENAI_API_KEY)
+
+# ---------------------- Flight Redirect config -------------------
+class TripFiltersModel(BaseModel):
+    origin_city: str
+    destination_city: str
+    outbound_date: str                       # 'YYYY-MM-DD' / 'YYYYMMDD' / 'YYMMDD'
+    return_date: Optional[str] = None
+    adults: Optional[int] = 1
+    children: Optional[int] = None
+    cabinclass: Optional[Literal["economy","premiumeconomy","business","first"]] = "economy"
+    outbound_alts: Optional[bool] = None
+    inbound_alts: Optional[bool] = None
+    fare_attributes: Optional[List[str]] = None         # e.g., ['cabin-bag','checked-bag']
+    prefer_directs: Optional[bool] = None
+    market_domain: str = "www.skyscanner.qa"
+    nearby_radius_km: int = 150
+    use_mac: bool = False
 
 # ------------------------- Visa API config -----------------------
 RAPID_KEY = os.getenv("RAPIDAPI_KEY", "")
