@@ -1,0 +1,183 @@
+"""Trip service layer."""
+
+from typing import List, Optional
+import uuid
+
+from sqlalchemy import select, func
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.db.models import Trip, TripPlan, TripChecklist, TripStatus, User
+from app.trips.schemas import TripCreateRequest, TripUpdateRequest
+
+
+class TripsService:
+    """Service for trip management."""
+
+    async def create_trip(
+        self, 
+        session: AsyncSession, 
+        user_id: str,  # Changed from UUID to str
+        trip_data: TripCreateRequest
+    ) -> Trip:
+        """Create a new trip."""
+        trip = Trip(
+            user_id=user_id,
+            **trip_data.dict(exclude_unset=True)
+        )
+        
+        session.add(trip)
+        await session.commit()
+        await session.refresh(trip)
+        return trip
+
+    async def get_trip_by_id(
+        self, 
+        session: AsyncSession, 
+        trip_id: str,  # Changed from UUID to str
+        user_id: str   # Changed from UUID to str
+    ) -> Optional[Trip]:
+        """Get a trip by ID for a specific user."""
+        stmt = select(Trip).where(
+            Trip.id == trip_id,
+            Trip.user_id == user_id
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def get_user_trips(
+        self, 
+        session: AsyncSession, 
+        user_id: str,  # Changed from UUID to str
+        status: Optional[TripStatus] = None,
+        page: int = 1,
+        per_page: int = 20
+    ) -> tuple[List[Trip], int]:
+        """Get trips for a user with pagination."""
+        # Build query
+        stmt = select(Trip).where(Trip.user_id == user_id)
+        
+        if status:
+            stmt = stmt.where(Trip.status == status)
+        
+        # Count total
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        count_result = await session.execute(count_stmt)
+        total = count_result.scalar()
+        
+        # Apply pagination and ordering
+        stmt = stmt.order_by(Trip.created_at.desc())
+        stmt = stmt.offset((page - 1) * per_page).limit(per_page)
+        
+        result = await session.execute(stmt)
+        trips = result.scalars().all()
+        
+        return list(trips), total
+
+    async def update_trip(
+        self,
+        session: AsyncSession,
+        trip_id: str,  # Changed from UUID to str
+        user_id: str,  # Changed from UUID to str
+        update_data: TripUpdateRequest
+    ) -> Optional[Trip]:
+        """Update a trip."""
+        trip = await self.get_trip_by_id(session, trip_id, user_id)
+        
+        if not trip:
+            return None
+        
+        # Apply updates
+        update_dict = update_data.dict(exclude_unset=True)
+        for field, value in update_dict.items():
+            setattr(trip, field, value)
+        
+        await session.commit()
+        await session.refresh(trip)
+        return trip
+
+    async def delete_trip(
+        self,
+        session: AsyncSession,
+        trip_id: str,  # Changed from UUID to str
+        user_id: str   # Changed from UUID to str
+    ) -> bool:
+        """Delete a trip (soft delete by setting status)."""
+        trip = await self.get_trip_by_id(session, trip_id, user_id)
+        
+        if not trip:
+            return False
+        
+        trip.status = TripStatus.CANCELLED
+        await session.commit()
+        return True
+
+    async def finalize_trip(
+        self,
+        session: AsyncSession,
+        trip_id: str,  # Changed from UUID to str
+        user_id: str,  # Changed from UUID to str
+        plan_json: dict,
+        checklist_json: dict
+    ) -> Optional[Trip]:
+        """Finalize a trip and save plan/checklist."""
+        trip = await self.get_trip_by_id(session, trip_id, user_id)
+        
+        if not trip or trip.status != TripStatus.DRAFT:
+            return None
+        
+        # Save plan
+        trip_plan = TripPlan(
+            trip_id=trip_id,
+            plan_json=plan_json
+        )
+        session.add(trip_plan)
+        
+        # Save checklist
+        trip_checklist = TripChecklist(
+            trip_id=trip_id,
+            checklist_json=checklist_json
+        )
+        session.add(trip_checklist)
+        
+        # Update trip status
+        trip.status = TripStatus.PLANNED
+        
+        await session.commit()
+        await session.refresh(trip)
+        return trip
+
+    async def get_trip_plan(
+        self,
+        session: AsyncSession,
+        trip_id: str,  # Changed from UUID to str
+        user_id: str   # Changed from UUID to str
+    ) -> Optional[TripPlan]:
+        """Get the plan for a trip."""
+        # Verify user owns the trip
+        trip = await self.get_trip_by_id(session, trip_id, user_id)
+        if not trip:
+            return None
+        
+        stmt = select(TripPlan).where(TripPlan.trip_id == trip_id)
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def get_trip_checklist(
+        self,
+        session: AsyncSession,
+        trip_id: str,  # Changed from UUID to str
+        user_id: str   # Changed from UUID to str
+    ) -> Optional[TripChecklist]:
+        """Get the checklist for a trip."""
+        # Verify user owns the trip
+        trip = await self.get_trip_by_id(session, trip_id, user_id)
+        if not trip:
+            return None
+        
+        stmt = select(TripChecklist).where(TripChecklist.trip_id == trip_id)
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+
+# Global service instance
+trips_service = TripsService()
