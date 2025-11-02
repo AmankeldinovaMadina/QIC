@@ -5,7 +5,7 @@ import uuid
 import json
 import math
 from datetime import datetime, time, timedelta, timezone
-from typing import Any, Dict, List, Literal, Optional, Iterable
+from typing import Any, Dict, List, Literal, Optional
 from fastapi.responses import Response, PlainTextResponse
 
 
@@ -34,23 +34,6 @@ if not OPENAI_API_KEY:
     raise RuntimeError("OPENAI_API_KEY is not set")
 client = OpenAI(api_key=OPENAI_API_KEY)
 
-# ---------------------- Flight Redirect config -------------------
-class TripFiltersModel(BaseModel):
-    origin_city: str
-    destination_city: str
-    outbound_date: str                       # 'YYYY-MM-DD' / 'YYYYMMDD' / 'YYMMDD'
-    return_date: Optional[str] = None
-    adults: Optional[int] = 1
-    children: Optional[int] = None
-    cabinclass: Optional[Literal["economy","premiumeconomy","business","first"]] = "economy"
-    outbound_alts: Optional[bool] = None
-    inbound_alts: Optional[bool] = None
-    fare_attributes: Optional[List[str]] = None         # e.g., ['cabin-bag','checked-bag']
-    prefer_directs: Optional[bool] = None
-    market_domain: str = "www.skyscanner.qa"
-    nearby_radius_km: int = 150
-    use_mac: bool = False
-
 # ------------------------- Visa API config -----------------------
 RAPID_KEY = os.getenv("RAPIDAPI_KEY", "")
 VISA_BASE = "https://visa-requirement.p.rapidapi.com"
@@ -60,6 +43,32 @@ VISA_HEADERS = {
     "Content-Type": "application/json",
 }
 class VisaApiError(Exception): pass
+
+# ---------------------- Flight Redirect schema -------------------
+class FlightTicketsModel(BaseModel):
+    origin_city: str
+    destination_city: str
+    outbound_date: str
+    return_date: Optional[str] = None
+
+    adults: int = Field(default=1, ge=1)
+    children: int = Field(default=0, ge=0)
+
+    cabinclass: Literal["economy","premiumeconomy","business","first"] = "economy"
+    outbound_alts: Optional[bool] = None
+    inbound_alts: Optional[bool] = None
+    prefer_directs: Optional[bool] = None
+
+    # booleans exactly matching your TripFilters
+    cabin_bag: Optional[bool] = None
+    checked_bag: Optional[bool] = None
+
+    market_domain: str = "www.skyscanner.qa"
+    nearby_radius_km: int = Field(default=150, ge=10, le=500)
+    use_mac: bool = False
+
+class FlightLinkResponse(BaseModel):
+    url: str
 
 # ------------------------- Trip plan schema ----------------------
 Transport = Literal["walk","bus","metro","tram","train","car","taxi","ferry","bike","rideshare","plane","other"]
@@ -208,6 +217,12 @@ def generate_trip_plan_structured(req: PlanRequest) -> TripPlan:
     return _normalize_trip_plan(plan)
 
 # ------------------------- Helpers -------------------------------
+def _to_tripfilters(cfg: FlightTicketsModel) -> url_builder.TripFilters:
+    """
+    Construct url_builder.TripFilters via keyword args (matches your __init__).
+    """
+    return url_builder.TripFilters(**cfg.model_dump())
+
 def _date(s: str) -> datetime:
     return datetime.fromisoformat(s if "T" in s else f"{s}T00:00:00")
 
@@ -275,6 +290,19 @@ async def get_visa_requirement(passport_iso2: str, destination_iso2: str) -> Any
 async def health():
     return {"status": "ok"}
 
+@app.post("/flight/link", response_model=FlightLinkResponse)
+async def flight_link(filters: FlightTicketsModel):
+    """
+    Build and return a Skyscanner URL for client-side navigation.
+    Your frontend can handle the redirect, e.g. window.location = url.
+    """
+    try:
+        tf = _to_tripfilters(filters)
+        url = url_builder.build_url(tf)
+        return FlightLinkResponse(url=url)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Could not build flight link: {str(e)}")
+
 @app.post("/ai/plan", response_model=PlanResponse)
 def ai_plan(req: PlanRequest):
     sid = req.session_id or str(uuid.uuid4())
@@ -307,6 +335,7 @@ class RankWeights(BaseModel):
             "Not admitted": -1,
         }
     )
+
 @app.post("/ai/plan/ics-file")
 def ai_plan_ics_file(req: PlanRequest):
     """Return a real .ics file (not JSON) so browsers download/import directly."""

@@ -76,6 +76,7 @@ class TripFilters:
     outbound_alts: Optional[bool] = None        # None => omit param
     inbound_alts: Optional[bool] = None
     prefer_directs: Optional[bool] = None
+    # Replaces fare_attributes iterable:
     cabin_bag: Optional[bool] = None            # True => include; False/None => don’t include
     checked_bag: Optional[bool] = None
     market_domain: str = "www.skyscanner.qa"
