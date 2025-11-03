@@ -10,11 +10,21 @@ interface LoginPageProps {
 
 export function LoginPage({ onLogin }: LoginPageProps) {
   const [username, setUsername] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (username.length >= 3) {
-      onLogin(username);
+      setIsLoading(true);
+      setError('');
+      try {
+        await onLogin(username);
+      } catch (err: any) {
+        setError(err.message || 'Login failed. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -53,12 +63,15 @@ export function LoginPage({ onLogin }: LoginPageProps) {
               </div>
             </div>
 
+            {error && (
+              <p className="text-sm text-red-500 text-center">{error}</p>
+            )}
             <Button
               type="submit"
               className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 h-11"
-              disabled={username.length < 3}
+              disabled={username.length < 3 || isLoading}
             >
-              Continue
+              {isLoading ? 'Loading...' : 'Continue'}
             </Button>
           </form>
 

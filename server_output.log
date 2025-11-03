@@ -1,6 +1,42 @@
-INFO:     Started server process [52841]
+INFO:     Will watch for changes in these directories: ['/Users/danazhaksylyk/QIC']
+INFO:     Uvicorn running on http://0.0.0.0:8001 (Press CTRL+C to quit)
+INFO:     Started reloader process [28306] using StatReload
+INFO:     Started server process [28320]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
-ERROR:    [Errno 48] error while attempting to bind on address ('0.0.0.0', 8001): address already in use
-INFO:     Waiting for application shutdown.
-INFO:     Application shutdown complete.
+2025-11-03 22:50:31,054 - http - INFO - Request started: GET http://localhost:8001/api/v1/health
+2025-11-03 22:50:31,055 - http - INFO - Request completed: GET http://localhost:8001/api/v1/health - 200
+INFO:     127.0.0.1:58815 - "GET /api/v1/health HTTP/1.1" 200 OK
+2025-11-03 22:50:41,183 - http - INFO - Request started: POST http://localhost:8001/api/v1/auth/login
+2025-11-03 22:50:41,204 - http - INFO - Request completed: POST http://localhost:8001/api/v1/auth/login - 401
+INFO:     127.0.0.1:58864 - "POST /api/v1/auth/login HTTP/1.1" 401 Unauthorized
+2025-11-03 22:50:50,133 - http - INFO - Request started: POST http://localhost:8001/api/v1/auth/register
+2025-11-03 22:50:50,140 - http - INFO - Request completed: POST http://localhost:8001/api/v1/auth/register - 200
+INFO:     127.0.0.1:58905 - "POST /api/v1/auth/register HTTP/1.1" 200 OK
+2025-11-03 22:55:59,016 - http - INFO - Request started: OPTIONS http://localhost:8001/api/v1/auth/login
+2025-11-03 22:55:59,016 - http - INFO - Request completed: OPTIONS http://localhost:8001/api/v1/auth/login - 200
+INFO:     127.0.0.1:60317 - "OPTIONS /api/v1/auth/login HTTP/1.1" 200 OK
+2025-11-03 22:55:59,017 - http - INFO - Request started: POST http://localhost:8001/api/v1/auth/login
+2025-11-03 22:55:59,021 - http - INFO - Request completed: POST http://localhost:8001/api/v1/auth/login - 401
+INFO:     127.0.0.1:60317 - "POST /api/v1/auth/login HTTP/1.1" 401 Unauthorized
+2025-11-03 22:55:59,026 - http - INFO - Request started: OPTIONS http://localhost:8001/api/v1/auth/register
+2025-11-03 22:55:59,026 - http - INFO - Request completed: OPTIONS http://localhost:8001/api/v1/auth/register - 200
+INFO:     127.0.0.1:60317 - "OPTIONS /api/v1/auth/register HTTP/1.1" 200 OK
+2025-11-03 22:55:59,027 - http - INFO - Request started: POST http://localhost:8001/api/v1/auth/register
+2025-11-03 22:55:59,034 - http - INFO - Request completed: POST http://localhost:8001/api/v1/auth/register - 200
+INFO:     127.0.0.1:60319 - "POST /api/v1/auth/register HTTP/1.1" 200 OK
+2025-11-03 22:59:04,343 - http - INFO - Request started: OPTIONS http://localhost:8001/api/v1/auth/me
+2025-11-03 22:59:04,343 - http - INFO - Request completed: OPTIONS http://localhost:8001/api/v1/auth/me - 200
+INFO:     127.0.0.1:61117 - "OPTIONS /api/v1/auth/me HTTP/1.1" 200 OK
+2025-11-03 22:59:04,345 - http - INFO - Request started: GET http://localhost:8001/api/v1/auth/me
+2025-11-03 22:59:04,349 - http - INFO - Request completed: GET http://localhost:8001/api/v1/auth/me - 200
+INFO:     127.0.0.1:61117 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+2025-11-03 22:59:08,103 - http - INFO - Request started: OPTIONS http://localhost:8001/api/v1/trips?page=1&per_page=20
+2025-11-03 22:59:08,104 - http - INFO - Request completed: OPTIONS http://localhost:8001/api/v1/trips?page=1&per_page=20 - 200
+INFO:     127.0.0.1:61117 - "OPTIONS /api/v1/trips?page=1&per_page=20 HTTP/1.1" 200 OK
+2025-11-03 22:59:08,106 - http - INFO - Request started: GET http://localhost:8001/api/v1/trips?page=1&per_page=20
+2025-11-03 22:59:08,114 - http - INFO - Request completed: GET http://localhost:8001/api/v1/trips?page=1&per_page=20 - 200
+INFO:     127.0.0.1:61119 - "GET /api/v1/trips?page=1&per_page=20 HTTP/1.1" 200 OK
+2025-11-03 23:01:32,941 - http - INFO - Request started: GET http://localhost:8001/api/v1/trips?page=1&per_page=20
+2025-11-03 23:01:32,958 - http - INFO - Request completed: GET http://localhost:8001/api/v1/trips?page=1&per_page=20 - 200
+INFO:     127.0.0.1:61767 - "GET /api/v1/trips?page=1&per_page=20 HTTP/1.1" 200 OK

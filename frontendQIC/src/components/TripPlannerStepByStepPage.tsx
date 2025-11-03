@@ -1,5 +1,5 @@
 import { ArrowLeft, Check, Plane, Hotel, MapPin, Bell, ChevronRight, Settings } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -8,6 +8,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collap
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
+import { flightsApi, hotelsApi, entertainmentApi } from '../utils/api';
 
 interface TripPlannerStepByStepPageProps {
   onBack: () => void;
@@ -20,9 +21,18 @@ type Step = 'tickets' | 'hotels' | 'activities' | 'confirmation';
 
 export function TripPlannerStepByStepPage({ onBack, tripData, onConfirm, onNotifications }: TripPlannerStepByStepPageProps) {
   const [currentStep, setCurrentStep] = useState<Step>('tickets');
-  const [selectedFlight, setSelectedFlight] = useState<number | null>(null);
-  const [selectedHotel, setSelectedHotel] = useState<number | null>(null);
-  const [selectedActivities, setSelectedActivities] = useState<number[]>([]);
+  const [selectedFlight, setSelectedFlight] = useState<string | null>(null);
+  const [selectedHotel, setSelectedHotel] = useState<string | null>(null);
+  const [selectedActivities, setSelectedActivities] = useState<string[]>([]);
+  
+  // API data
+  const [flightOptions, setFlightOptions] = useState<any[]>([]);
+  const [hotelOptions, setHotelOptions] = useState<any[]>([]);
+  const [activityOptions, setActivityOptions] = useState<any[]>([]);
+  const [isLoadingFlights, setIsLoadingFlights] = useState(false);
+  const [isLoadingHotels, setIsLoadingHotels] = useState(false);
+  const [isLoadingActivities, setIsLoadingActivities] = useState(false);
+  const [isSavingSelections, setIsSavingSelections] = useState(false);
   
   // Flight preferences
   const [showFlightPreferences, setShowFlightPreferences] = useState(false);
@@ -36,10 +46,44 @@ export function TripPlannerStepByStepPage({ onBack, tripData, onConfirm, onNotif
   const [hotelLocation, setHotelLocation] = useState('any');
   const [hotelNotes, setHotelNotes] = useState('');
 
-  const flightOptions = [
-    { 
-      id: 1, 
-      airline: 'Emirates', 
+  const toggleActivity = (id: string) => {
+    setSelectedActivities(prev =>
+      prev.includes(id) ? prev.filter(actId => actId !== id) : [...prev, id]
+    );
+  };
+
+  // Fetch flight data when component mounts
+  useEffect(() => {
+    if (currentStep === 'tickets' && tripData?.id) {
+      fetchFlightOptions();
+    }
+  }, [currentStep, tripData?.id]);
+
+  // Fetch hotel data when step changes
+  useEffect(() => {
+    if (currentStep === 'hotels' && tripData?.id) {
+      fetchHotelOptions();
+    }
+  }, [currentStep, tripData?.id]);
+
+  // Fetch activity data when step changes
+  useEffect(() => {
+    if (currentStep === 'activities' && tripData?.id) {
+      fetchActivityOptions();
+    }
+  }, [currentStep, tripData?.id]);
+
+  // Generate mock flight data for MVP (since we don't have flight search API yet)
+  const generateMockFlights = async () => {
+    const fromCity = tripData?.from_city || tripData?.fromCity || 'Origin';
+    const toCity = tripData?.to_city || tripData?.toCity || 'Destination';
+    const startDate = tripData?.start_date || tripData?.startDate || new Date();
+
+    // Mock flights based on route
+    const mockFlights = [
+      {
+        id: 'flight_1',
+        airline: 'Premium Airlines',
       price: '$450', 
       time: '10:30 AM - 2:45 PM', 
       duration: '4h 15m', 
@@ -49,19 +93,8 @@ export function TripPlannerStepByStepPage({ onBack, tripData, onConfirm, onNotif
       cons: []
     },
     { 
-      id: 2, 
-      airline: 'Qatar Airways', 
-      price: '$520', 
-      time: '2:15 PM - 6:30 PM', 
-      duration: '4h 15m', 
-      stops: 'Direct', 
-      class: 'Economy',
-      pros: ['Direct flight', 'Award-winning service'],
-      cons: ['Higher price']
-    },
-    { 
-      id: 3, 
-      airline: 'FlyDubai', 
+        id: 'flight_2',
+        airline: 'Value Airlines',
       price: '$380', 
       time: '6:00 AM - 10:15 AM', 
       duration: '4h 15m', 
@@ -69,123 +102,228 @@ export function TripPlannerStepByStepPage({ onBack, tripData, onConfirm, onNotif
       class: 'Economy',
       pros: ['Best price', 'Morning arrival'],
       cons: ['One stop', 'Early departure']
-    },
-    { 
-      id: 4, 
-      airline: 'Emirates Business', 
-      price: '$1250', 
-      time: '11:00 AM - 3:15 PM', 
-      duration: '4h 15m', 
-      stops: 'Direct', 
-      class: 'Business',
-      pros: ['Business class', 'Direct flight', 'Luxury service'],
-      cons: ['Premium price']
-    }
-  ];
+      }
+    ];
 
-  const hotelOptions = [
-    { 
-      id: 1, 
-      name: 'Luxury Resort & Spa', 
-      price: '$250/night', 
-      rating: 4.8, 
-      amenities: ['Pool', 'Spa', 'Restaurant', 'Beach Access'],
-      image: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=400&q=80',
-      location: 'Downtown',
-      pros: ['Best rating', 'Beach access', 'Full spa'],
-      cons: ['Higher price']
-    },
-    { 
-      id: 3, 
-      name: 'Boutique Hotel', 
-      price: '$180/night', 
-      rating: 4.7, 
-      amenities: ['Rooftop', 'Bar', 'WiFi', 'Concierge'],
-      image: 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=400&q=80',
-      location: 'Old Town',
-      pros: ['Great value', 'Historic area', 'Rooftop bar'],
-      cons: []
-    },
-    { 
-      id: 2, 
-      name: 'City Center Hotel', 
-      price: '$150/night', 
-      rating: 4.5, 
-      amenities: ['Gym', 'WiFi', 'Breakfast', 'Parking'],
-      image: 'https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=400&q=80',
-      location: 'City Center',
-      pros: ['Best price', 'Central location', 'Free breakfast'],
-      cons: ['Basic amenities']
+    // Try to rank with AI
+    try {
+      const preferencesPrompt = buildFlightPreferences();
+      const flightPayload = {
+        search_id: `search_${tripData.id}`,
+        preferences_prompt: preferencesPrompt,
+        flights: mockFlights.map(f => ({
+          id: f.id,
+          price: { amount: parseFloat(f.price.replace('$', '')), currency: 'USD' },
+          total_duration_min: 255,
+          stops: f.stops === 'Direct' ? 0 : 1,
+          legs: [{
+            dep_iata: 'ORIG',
+            dep_time: startDate.toISOString?.() || new Date().toISOString(),
+            arr_iata: 'DEST',
+            arr_time: new Date(Date.now() + 255 * 60000).toISOString(),
+            marketing: f.airline,
+            flight_no: 'XX123',
+            duration_min: 255
+          }]
+        }))
+      };
+      
+      const ranked: any = await flightsApi.rankFlights(flightPayload);
+      const formatted = ranked.items.map((item: any) => {
+        const original = mockFlights.find(f => f.id === item.id);
+        return {
+          ...original,
+          score: item.score,
+          aiPros: item.pros_keywords,
+          aiCons: item.cons_keywords
+        };
+      });
+      setFlightOptions(formatted);
+    } catch (error) {
+      console.error('Flight ranking failed, using mock data:', error);
+      setFlightOptions(mockFlights);
     }
-  ];
+  };
 
-  const activityOptions = [
-    { 
-      id: 1, 
-      name: 'Desert Safari', 
-      price: '$80', 
-      duration: '6 hours', 
-      image: 'https://images.unsplash.com/photo-1451337516015-6b6e9a44a8a3?w=400&q=80',
-      description: 'Experience dune bashing and camel riding',
-      pros: ['Must-see experience', 'Sunset views', 'Traditional dinner'],
-      cons: []
-    },
-    { 
-      id: 3, 
-      name: 'Burj Khalifa Visit', 
-      price: '$60', 
-      duration: '2 hours',
-      image: 'https://images.unsplash.com/photo-1582672060674-bc2bd808a8b5?w=400&q=80',
-      description: 'Visit the worlds tallest building',
-      pros: ['Iconic landmark', 'Amazing views', 'Quick visit'],
-      cons: []
-    },
-    { 
-      id: 4, 
-      name: 'Marina Dinner Cruise', 
-      price: '$100', 
-      duration: '3 hours',
-      image: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=400&q=80',
-      description: 'Luxury dining on the water',
-      pros: ['Romantic setting', 'Live entertainment', 'Premium dining'],
-      cons: ['Higher price']
-    },
-    { 
-      id: 6, 
-      name: 'Water Park Day', 
-      price: '$70', 
-      duration: 'Full day',
-      image: 'https://images.unsplash.com/photo-1525268771113-32d9e9021a97?w=400&q=80',
-      description: 'Thrilling water slides and attractions',
-      pros: ['Family-friendly', 'All-day fun', 'Beat the heat'],
-      cons: ['Full day required']
-    },
-    { 
-      id: 2, 
-      name: 'City Tour', 
-      price: '$50', 
-      duration: '4 hours',
-      image: 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=400&q=80',
-      description: 'Explore major landmarks and attractions',
-      pros: ['Budget-friendly', 'Comprehensive overview'],
-      cons: ['Basic tour']
-    },
-    { 
-      id: 5, 
-      name: 'Shopping Tour', 
-      price: '$40', 
-      duration: '5 hours',
-      image: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400&q=80',
-      description: 'Visit premium malls and souks',
-      pros: ['Best shopping deals', 'Local markets'],
-      cons: ['Long duration']
+  const fetchFlightOptions = async () => {
+    if (!tripData?.id || isLoadingFlights) return;
+    setIsLoadingFlights(true);
+    try {
+      await generateMockFlights();
+    } catch (error) {
+      console.error('Failed to fetch flights:', error);
+    } finally {
+      setIsLoadingFlights(false);
     }
-  ];
+  };
 
-  const toggleActivity = (id: number) => {
-    setSelectedActivities(prev =>
-      prev.includes(id) ? prev.filter(actId => actId !== id) : [...prev, id]
-    );
+  const buildFlightPreferences = (): string => {
+    let pref = '';
+    if (flightTransit !== 'any') {
+      pref += `Prefer ${flightTransit} flights. `;
+    }
+    if (flightClass !== 'economy') {
+      pref += `Prefer ${flightClass}. `;
+    }
+    return pref || 'Good value for money with reasonable comfort.';
+  };
+
+  const fetchHotelOptions = async () => {
+    if (!tripData?.id || isLoadingHotels) return;
+    setIsLoadingHotels(true);
+    try {
+      const toCity = tripData?.to_city || tripData?.toCity || 'Bali';
+      const startDate = new Date(tripData?.start_date || tripData?.startDate);
+      const endDate = new Date(tripData?.end_date || tripData?.endDate);
+      
+      const searchQuery = {
+        q: `Hotels in ${toCity}`,
+        check_in_date: startDate.toISOString().split('T')[0],
+        check_out_date: endDate.toISOString().split('T')[0],
+        adults: tripData?.adults || 2,
+        currency: 'USD'
+      };
+
+      const searchResult: any = await hotelsApi.searchHotels(searchQuery);
+      
+      // Transform SerpApi results to our format
+      const hotels = transformHotelResults(searchResult.data);
+      
+      // Rank hotels with AI
+      const ranked: any = await hotelsApi.rankHotels({
+        search_id: `hotel_search_${tripData.id}`,
+        preferences_prompt: buildHotelPreferences(),
+        hotels: hotels
+      });
+      
+      const formatted = ranked.items.map((item: any) => {
+        const original = hotels.find((h: any) => h.id === item.id);
+        return {
+          ...original,
+          score: item.score,
+          aiPros: item.pros_keywords,
+          aiCons: item.cons_keywords
+        };
+      });
+      
+      setHotelOptions(formatted.slice(0, 10)); // Limit to 10
+    } catch (error) {
+      console.error('Failed to fetch hotels:', error);
+      setHotelOptions([]);
+    } finally {
+      setIsLoadingHotels(false);
+    }
+  };
+
+  const transformHotelResults = (data: any): any[] => {
+    const hotels = data?.properties || [];
+    return hotels.map((hotel: any, idx: number) => {
+      // Convert price fields to numbers and ensure they're valid
+      const parsePrice = (price: any): number => {
+        if (typeof price === 'number') return price;
+        if (typeof price === 'string') {
+          // Remove currency symbols and parse
+          const cleaned = price.replace(/[^0-9.]/g, '');
+          const parsed = parseFloat(cleaned);
+          return isNaN(parsed) ? 0 : parsed;
+        }
+        return 0;
+      };
+
+      // Ensure numeric values are within valid ranges
+      const rating = hotel.overall_rating ? Math.max(0, Math.min(5, parseFloat(hotel.overall_rating))) : null;
+      const reviewsCount = hotel.reviews ? Math.max(0, parseInt(hotel.reviews)) : 0;
+
+      // Try various ID fields that SerpApi might use
+      const hotelId = String(
+        hotel.property_token || 
+        hotel.gmid || 
+        hotel.data_id || 
+        hotel.data_cid || 
+        `hotel_${idx}`
+      );
+      
+      // Get first image thumbnail if available
+      const firstImage = Array.isArray(hotel.images) && hotel.images.length > 0 
+        ? hotel.images[0].thumbnail 
+        : null;
+      
+      return {
+        id: hotelId,
+        name: String(hotel.name || 'Unknown Hotel'),
+        location: String(hotel.gps_coordinates?.latitude && hotel.gps_coordinates?.longitude 
+          ? `${hotel.gps_coordinates.latitude.toFixed(4)}, ${hotel.gps_coordinates.longitude.toFixed(4)}`
+          : 'Location not available'),
+        price_per_night: parsePrice(hotel.rate_per_night?.extracted_lowest || hotel.rate_per_night?.lowest || 0),
+        total_price: parsePrice(hotel.total_rate?.extracted_lowest || hotel.total_rate?.lowest || 0),
+        currency: 'USD',
+        rating: rating,
+        reviews_count: reviewsCount,
+        hotel_class: null, // Not provided by SerpApi
+        amenities: Array.isArray(hotel.amenities) ? hotel.amenities : [],
+        free_cancellation: null, // Not reliably provided
+        thumbnail: firstImage
+      };
+    });
+  };
+
+  const buildHotelPreferences = (): string => {
+    let pref = '';
+    if (hotelNotes) {
+      pref += hotelNotes + '. ';
+    }
+    if (hotelLocation !== 'any') {
+      pref += `Prefer ${hotelLocation}. `;
+    }
+    return pref || 'Good location with essential amenities and value for money.';
+  };
+
+  const fetchActivityOptions = async () => {
+    if (!tripData?.id || isLoadingActivities) return;
+    setIsLoadingActivities(true);
+    try {
+      const toCity = tripData?.to_city || tripData?.toCity || 'Bali';
+      
+      const searchResult: any = await entertainmentApi.searchVenues({
+        trip_id: tripData.id,
+        destination: toCity
+      });
+      
+      const venues = searchResult.venues || [];
+      
+      // Rank venues with AI
+      const ranked: any = await entertainmentApi.rankVenues({
+        trip_id: tripData.id,
+        search_id: searchResult.search_id,
+        venues: venues
+      });
+      
+      const formatted = ranked.items.map((item: any) => {
+        const original = venues.find((v: any) => v.place_id === item.place_id);
+        return {
+          id: item.place_id,
+          name: original?.title || 'Unknown',
+          description: original?.description || '',
+          duration: '2-4 hours',
+          price: original?.price || '$$',
+          rating: original?.rating || 0,
+          reviews: original?.reviews || 0,
+          thumbnail: original?.thumbnail,
+          address: original?.address,
+          type: original?.type,
+          score: item.score,
+          aiPros: item.pros_keywords,
+          aiCons: item.cons_keywords
+        };
+      });
+      
+      setActivityOptions(formatted.slice(0, 20)); // Limit to 20
+    } catch (error) {
+      console.error('Failed to fetch activities:', error);
+      setActivityOptions([]);
+    } finally {
+      setIsLoadingActivities(false);
+    }
   };
 
   const handleNext = () => {
@@ -198,12 +336,104 @@ export function TripPlannerStepByStepPage({ onBack, tripData, onConfirm, onNotif
     }
   };
 
-  const handleConfirm = () => {
-    onConfirm({
-      flight: flightOptions.find(f => f.id === selectedFlight),
-      hotel: hotelOptions.find(h => h.id === selectedHotel),
-      activities: activityOptions.filter(a => selectedActivities.includes(a.id))
-    });
+  const handleConfirm = async () => {
+    setIsSavingSelections(true);
+    try {
+      // Save flight selection
+      if (selectedFlight) {
+        const flight = flightOptions.find(f => f.id === selectedFlight);
+        if (flight) {
+          const startDate = new Date(tripData?.start_date || tripData?.startDate);
+          await flightsApi.selectFlight({
+            trip_id: tripData.id,
+            flight_id: flight.id,
+            airline: flight.airline,
+            flight_number: 'TBD',
+            departure_airport: tripData?.from_city || tripData?.fromCity,
+            arrival_airport: tripData?.to_city || tripData?.toCity,
+            departure_time: startDate.toISOString(),
+            arrival_time: new Date(startDate.getTime() + 255 * 60000).toISOString(),
+            price: parseFloat(flight.price.replace('$', '')),
+            currency: 'USD',
+            total_duration_min: 255,
+            stops: flight.stops === 'Direct' ? 0 : 1,
+            title: flight.airline
+          });
+        }
+      }
+
+      // Save hotel selection
+      if (selectedHotel) {
+        const hotel = hotelOptions.find(h => h.id === selectedHotel);
+        if (hotel) {
+          const startDate = new Date(tripData?.start_date || tripData?.startDate);
+          const endDate = new Date(tripData?.end_date || tripData?.endDate);
+          await hotelsApi.selectHotel({
+            trip_id: tripData.id,
+            hotel_id: hotel.id,
+            hotel_name: hotel.name,
+            location: hotel.location,
+            price_per_night: hotel.price_per_night,
+            total_price: hotel.total_price,
+            currency: hotel.currency || 'USD',
+            check_in_date: startDate.toISOString().split('T')[0],
+            check_out_date: endDate.toISOString().split('T')[0],
+            rating: hotel.rating,
+            reviews_count: hotel.reviews_count,
+            hotel_class: hotel.hotel_class,
+            amenities: hotel.amenities,
+            free_cancellation: hotel.free_cancellation,
+            title: hotel.name
+          });
+        }
+      }
+
+      // Save entertainment selections
+      if (selectedActivities.length > 0) {
+        const activities = activityOptions.filter(a => selectedActivities.includes(a.id));
+        const selections = activities.map(activity => ({
+          venue: {
+            place_id: activity.id,
+            title: activity.name,
+            type: activity.type,
+            address: activity.address,
+            rating: activity.rating,
+            reviews: activity.reviews,
+            price: activity.price,
+            gps_coordinates: undefined,
+            thumbnail: activity.thumbnail
+          },
+          ranking: {
+            score: activity.score,
+            title: activity.name,
+            pros_keywords: activity.aiPros || activity.pros || [],
+            cons_keywords: activity.aiCons || activity.cons || []
+          }
+        }));
+        
+        await entertainmentApi.selectVenues({
+          trip_id: tripData.id,
+          selections
+        });
+      }
+
+      // Call parent callback with selection data
+      onConfirm({
+        flight: flightOptions.find(f => f.id === selectedFlight),
+        hotel: hotelOptions.find(h => h.id === selectedHotel),
+        activities: activityOptions.filter(a => selectedActivities.includes(a.id))
+      });
+    } catch (error) {
+      console.error('Failed to save selections:', error);
+      // Still call onConfirm to proceed
+      onConfirm({
+        flight: flightOptions.find(f => f.id === selectedFlight),
+        hotel: hotelOptions.find(h => h.id === selectedHotel),
+        activities: activityOptions.filter(a => selectedActivities.includes(a.id))
+      });
+    } finally {
+      setIsSavingSelections(false);
+    }
   };
 
   const getStepNumber = (step: Step) => {
@@ -231,11 +461,15 @@ export function TripPlannerStepByStepPage({ onBack, tripData, onConfirm, onNotif
     if (selectedHotel) {
       const hotel = hotelOptions.find(h => h.id === selectedHotel);
       const nights = 7; // Assume 7 nights
-      total += parseFloat(hotel?.price.replace('$', '').replace('/night', '') || '0') * nights;
+      const pricePerNight = hotel?.price_per_night || 0;
+      total += pricePerNight * nights;
     }
     selectedActivities.forEach(actId => {
       const activity = activityOptions.find(a => a.id === actId);
-      total += parseFloat(activity?.price.replace('$', '') || '0');
+      // Price is now a string like '$80' or empty
+      if (activity?.price) {
+        total += parseFloat(activity.price.replace(/\$/, '') || '0');
+      }
     });
     return total;
   };
@@ -385,7 +619,17 @@ export function TripPlannerStepByStepPage({ onBack, tripData, onConfirm, onNotif
               </Card>
             )}
 
-            {flightOptions.map((flight) => (
+            {isLoadingFlights ? (
+              <div className="text-center py-8">
+                <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                <p className="text-gray-600">Loading flight options...</p>
+              </div>
+            ) : flightOptions.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-gray-600">No flights available</p>
+              </div>
+            ) : (
+              flightOptions.map((flight) => (
               <Card
                 key={flight.id}
                 onClick={() => setSelectedFlight(flight.id)}
@@ -419,14 +663,15 @@ export function TripPlannerStepByStepPage({ onBack, tripData, onConfirm, onNotif
                     <span>{flight.stops}</span>
                   </div>
                 </div>
-                {(flight.pros.length > 0 || flight.cons.length > 0) && (
+                {((flight.aiPros && flight.aiPros.length > 0) || (flight.aiCons && flight.aiCons.length > 0) || 
+                  (flight.pros && flight.pros.length > 0) || (flight.cons && flight.cons.length > 0)) && (
                   <div className="mt-2 flex flex-wrap gap-1">
-                    {flight.pros.map((pro, idx) => (
+                    {(flight.aiPros || flight.pros || []).map((pro: string, idx: number) => (
                       <Badge key={`pro-${idx}`} className="bg-green-100 text-green-700 border-green-300 text-xs px-2 py-0 h-5">
                         {pro}
                       </Badge>
                     ))}
-                    {flight.cons.map((con, idx) => (
+                    {(flight.aiCons || flight.cons || []).map((con: string, idx: number) => (
                       <Badge key={`con-${idx}`} className="bg-red-100 text-red-700 border-red-300 text-xs px-2 py-0 h-5">
                         {con}
                       </Badge>
@@ -438,7 +683,8 @@ export function TripPlannerStepByStepPage({ onBack, tripData, onConfirm, onNotif
                   <span className="text-xs text-gray-500">per person</span>
                 </div>
               </Card>
-            ))}
+            ))
+            )}
           </div>
         )}
 
@@ -491,7 +737,17 @@ export function TripPlannerStepByStepPage({ onBack, tripData, onConfirm, onNotif
               </Card>
             )}
 
-            {hotelOptions.map((hotel) => (
+            {isLoadingHotels ? (
+              <div className="text-center py-8">
+                <div className="w-12 h-12 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                <p className="text-gray-600">Searching hotels...</p>
+              </div>
+            ) : hotelOptions.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-gray-600">No hotels found</p>
+              </div>
+            ) : (
+              hotelOptions.map((hotel) => (
               <Card
                 key={hotel.id}
                 onClick={() => setSelectedHotel(hotel.id)}
@@ -503,7 +759,7 @@ export function TripPlannerStepByStepPage({ onBack, tripData, onConfirm, onNotif
               >
                 <div className="flex gap-3 p-3">
                   <div className="w-24 h-24 rounded-lg overflow-hidden flex-shrink-0 bg-gray-200">
-                    <img src={hotel.image} alt={hotel.name} className="w-full h-full object-cover" />
+                    <img src={hotel.thumbnail || 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=400&q=80'} alt={hotel.name} className="w-full h-full object-cover" />
                   </div>
                   <div className="flex-1">
                     <div className="flex items-start justify-between mb-1">
@@ -522,29 +778,32 @@ export function TripPlannerStepByStepPage({ onBack, tripData, onConfirm, onNotif
                       )}
                     </div>
                     <div className="flex gap-1 flex-wrap mb-2">
-                      {hotel.amenities.slice(0, 3).map((amenity, idx) => (
+                      {(hotel.amenities || []).slice(0, 3).map((amenity, idx) => (
                         <Badge key={idx} variant="outline" className="text-xs px-1.5 py-0 h-5">
                           {amenity}
                         </Badge>
                       ))}
                     </div>
                     <div className="flex flex-wrap gap-1 mb-2">
-                      {hotel.pros.map((pro, idx) => (
+                      {(hotel.aiPros || hotel.pros || []).map((pro: string, idx: number) => (
                         <Badge key={`pro-${idx}`} className="bg-green-100 text-green-700 border-green-300 text-xs px-1.5 py-0 h-5">
                           {pro}
                         </Badge>
                       ))}
-                      {hotel.cons.map((con, idx) => (
+                      {(hotel.aiCons || hotel.cons || []).map((con: string, idx: number) => (
                         <Badge key={`con-${idx}`} className="bg-red-100 text-red-700 border-red-300 text-xs px-1.5 py-0 h-5">
                           {con}
                         </Badge>
                       ))}
                     </div>
-                    <p className="font-semibold text-sm text-purple-600">{hotel.price}</p>
+                    <p className="font-semibold text-sm text-purple-600">
+                      ${hotel.price_per_night}/night
+                    </p>
                   </div>
                 </div>
               </Card>
-            ))}
+            ))
+            )}
           </div>
         )}
 
@@ -552,7 +811,17 @@ export function TripPlannerStepByStepPage({ onBack, tripData, onConfirm, onNotif
         {currentStep === 'activities' && (
           <div className="space-y-3">
             <p className="text-sm text-gray-600 mb-4">Choose activities (select multiple)</p>
-            {activityOptions.map((activity) => (
+            {isLoadingActivities ? (
+              <div className="text-center py-8">
+                <div className="w-12 h-12 border-4 border-green-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                <p className="text-gray-600">Finding exciting activities...</p>
+              </div>
+            ) : activityOptions.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-gray-600">No activities found</p>
+              </div>
+            ) : (
+              activityOptions.map((activity) => (
               <Card
                 key={activity.id}
                 onClick={() => toggleActivity(activity.id)}
@@ -564,7 +833,7 @@ export function TripPlannerStepByStepPage({ onBack, tripData, onConfirm, onNotif
               >
                 <div className="flex gap-3 p-3">
                   <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 bg-gray-200">
-                    <img src={activity.image} alt={activity.name} className="w-full h-full object-cover" />
+                    <img src={activity.thumbnail || 'https://images.unsplash.com/photo-1451337516015-6b6e9a44a8a3?w=400&q=80'} alt={activity.name} className="w-full h-full object-cover" />
                   </div>
                   <div className="flex-1">
                     <div className="flex items-start justify-between mb-1">
@@ -573,12 +842,12 @@ export function TripPlannerStepByStepPage({ onBack, tripData, onConfirm, onNotif
                         <p className="text-xs text-gray-600 mb-2">{activity.description}</p>
                         <p className="text-xs text-gray-500 mb-2">{activity.duration}</p>
                         <div className="flex flex-wrap gap-1">
-                          {activity.pros.map((pro, idx) => (
+                          {(activity.aiPros || activity.pros || []).map((pro: string, idx: number) => (
                             <Badge key={`pro-${idx}`} className="bg-green-100 text-green-700 border-green-300 text-xs px-1.5 py-0 h-5">
                               {pro}
                             </Badge>
                           ))}
-                          {activity.cons.map((con, idx) => (
+                          {(activity.aiCons || activity.cons || []).map((con: string, idx: number) => (
                             <Badge key={`con-${idx}`} className="bg-red-100 text-red-700 border-red-300 text-xs px-1.5 py-0 h-5">
                               {con}
                             </Badge>
@@ -595,7 +864,8 @@ export function TripPlannerStepByStepPage({ onBack, tripData, onConfirm, onNotif
                   </div>
                 </div>
               </Card>
-            ))}
+            ))
+            )}
           </div>
         )}
 
@@ -642,7 +912,9 @@ export function TripPlannerStepByStepPage({ onBack, tripData, onConfirm, onNotif
                         </Badge>
                       ))}
                     </div>
-                    <p className="font-semibold text-purple-600 mt-2">{hotel.price}</p>
+                    <p className="font-semibold text-purple-600 mt-2">
+                      ${hotel.price_per_night}/night
+                    </p>
                   </div>
                 ) : null;
               })()}
@@ -700,9 +972,10 @@ export function TripPlannerStepByStepPage({ onBack, tripData, onConfirm, onNotif
           {currentStep === 'confirmation' && (
             <Button
               onClick={handleConfirm}
+              disabled={isSavingSelections}
               className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 h-12"
             >
-              Confirm & Create Trip
+              {isSavingSelections ? 'Saving...' : 'Confirm & Create Trip'}
             </Button>
           )}
         </div>

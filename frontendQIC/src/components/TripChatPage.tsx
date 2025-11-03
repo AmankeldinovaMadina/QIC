@@ -6,6 +6,7 @@ import { Button } from './ui/button';
 import { Calendar } from './ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { format } from 'date-fns';
+import { tripsApi } from '../utils/api';
 
 interface TripChatPageProps {
   onBack: () => void;
@@ -49,8 +50,90 @@ export function TripChatPage({ onBack, onComplete, onNotifications }: TripChatPa
   const [minBudget, setMinBudget] = useState('');
   const [maxBudget, setMaxBudget] = useState('');
   const [selectedActivities, setSelectedActivities] = useState<string[]>([]);
+  const [isCreatingTrip, setIsCreatingTrip] = useState(false);
 
   const cities = ['Dubai, UAE', 'Paris, France', 'Tokyo, Japan', 'New York, USA', 'Maldives', 'Istanbul, Turkey', 'Bali, Indonesia', 'London, UK', 'Rome, Italy', 'Barcelona, Spain', 'Singapore', 'Bangkok, Thailand', 'Sydney, Australia'];
+
+  // Map transport type from UI to backend
+  const mapTransportType = (transportOption: string): string => {
+    const mapping: { [key: string]: string } = {
+      '✈️ Flight': 'flight',
+      '🚂 Train': 'train',
+      '🚗 Car': 'car',
+      '🚢 Cruise': 'boat',
+      '🚌 Bus': 'car' // Map bus to car for now
+    };
+    return mapping[transportOption] || 'flight';
+  };
+
+  // Helper to create trip in backend
+  const createTrip = async () => {
+    if (!tripData.fromCity || !tripData.toCity || !tripData.startDate || !tripData.endDate) {
+      throw new Error('Missing required trip information');
+    }
+
+    const tripPayload: any = {
+      from_city: tripData.fromCity,
+      to_city: tripData.toCity,
+      start_date: tripData.startDate.toISOString(),
+      end_date: tripData.endDate.toISOString(),
+      transport: mapTransportType(tripData.transport || '✈️ Flight'),
+      adults: tripData.adults || 1,
+      children: tripData.children || 0,
+    };
+
+    // Add budget if provided
+    if (tripData.minBudget && tripData.maxBudget) {
+      tripPayload.budget_min = tripData.minBudget;
+      tripPayload.budget_max = tripData.maxBudget;
+    }
+
+    // Add entertainment tags if activities selected
+    if (tripData.selectedActivities && tripData.selectedActivities.length > 0) {
+      // Map activity emojis to tags
+      const activityTags = tripData.selectedActivities.map((activity: string) => {
+        return activity.split(' ').slice(1).join(' ').toLowerCase();
+      });
+      tripPayload.entertainment_tags = activityTags;
+    }
+
+    // Add notes if provided
+    if (tripData.notes) {
+      tripPayload.notes = tripData.notes;
+    }
+
+    const createdTrip = await tripsApi.createTrip(tripPayload);
+    return createdTrip;
+  };
+
+  // Handle trip completion and creation
+  const handleTripComplete = async (finalTripData: any) => {
+    setIsCreatingTrip(true);
+    const finalMessage: Message = {
+      id: messages.length + 2,
+      text: "Perfect! 🎉 I'm creating your personalized travel plan. This will just take a moment...",
+      isAI: true
+    };
+    setMessages(prev => [...prev, finalMessage]);
+    
+    try {
+      console.log('Trip data:', tripData);
+      console.log('From city:', tripData.fromCity, 'To city:', tripData.toCity);
+      console.log('Start date:', tripData.startDate, 'End date:', tripData.endDate);
+      const createdTrip = await createTrip();
+      // Pass the created trip data to the parent
+      onComplete({ ...createdTrip, ...finalTripData });
+    } catch (error: any) {
+      console.error('Failed to create trip:', error);
+      const errorMessage: Message = {
+        id: messages.length + 3,
+        text: `Sorry, there was an error creating your trip: ${error.message}. Please try again.`,
+        isAI: true
+      };
+      setMessages(prev => [...prev, errorMessage]);
+      setIsCreatingTrip(false);
+    }
+  };
 
   const questions = [
     { 
@@ -133,17 +216,8 @@ export function TripChatPage({ onBack, onComplete, onNotifications }: TripChatPa
         setMessages(prev => [...prev, aiMessage]);
         setCurrentStep(nextStep);
       } else {
-        // All questions answered
-        const finalMessage: Message = {
-          id: messages.length + 2,
-          text: "Perfect! 🎉 I'm creating your personalized travel plan. This will just take a moment...",
-          isAI: true
-        };
-        setMessages(prev => [...prev, finalMessage]);
-        
-        setTimeout(() => {
-          onComplete({ ...tripData, [currentQuestion.key]: messageText });
-        }, 2000);
+        // All questions answered - create trip
+        handleTripComplete({ ...tripData, [currentQuestion.key]: messageText });
       }
     }, 500);
   };
@@ -191,23 +265,25 @@ export function TripChatPage({ onBack, onComplete, onNotifications }: TripChatPa
         setMessages(prev => [...prev, aiMessage]);
         setCurrentStep(nextStep);
       } else {
-        // All questions answered
-        const finalMessage: Message = {
-          id: messages.length + 2,
-          text: "Perfect! 🎉 I'm creating your personalized travel plan. This will just take a moment...",
-          isAI: true
-        };
-        setMessages(prev => [...prev, finalMessage]);
-        
-        setTimeout(() => {
-          onComplete({ ...tripData, [currentQuestion.key]: option });
-        }, 2000);
+        // All questions answered - create trip
+        handleTripComplete({ ...tripData, [currentQuestion.key]: option });
       }
     }, 500);
   };
 
   const handleDateSelection = () => {
     if (!selectedStartDate || !selectedEndDate) return;
+
+    // Validate dates
+    if (selectedEndDate <= selectedStartDate) {
+      const errorMessage: Message = {
+        id: messages.length + 1,
+        text: "❌ End date must be after start date. Please select different dates.",
+        isAI: true
+      };
+      setMessages(prev => [...prev, errorMessage]);
+      return;
+    }
 
     const dateRange = `${format(selectedStartDate, 'MMM dd, yyyy')} - ${format(selectedEndDate, 'MMM dd, yyyy')}`;
     
@@ -447,17 +523,8 @@ export function TripChatPage({ onBack, onComplete, onNotifications }: TripChatPa
         setMessages(prev => [...prev, aiMessage]);
         setCurrentStep(nextStep);
       } else {
-        // All questions answered
-        const finalMessage: Message = {
-          id: messages.length + 2,
-          text: "Perfect! 🎉 I'm creating your personalized travel plan. This will just take a moment...",
-          isAI: true
-        };
-        setMessages(prev => [...prev, finalMessage]);
-        
-        setTimeout(() => {
-          onComplete({ ...tripData, [currentQuestion.key]: activitiesText, selectedActivities: [...selectedActivities] });
-        }, 2000);
+        // All questions answered - create trip
+        handleTripComplete({ ...tripData, [currentQuestion.key]: activitiesText, selectedActivities: [...selectedActivities] });
       }
     }, 500);
   };
@@ -688,11 +755,16 @@ export function TripChatPage({ onBack, onComplete, onNotifications }: TripChatPa
                     </div>
                     <Button
                       onClick={handleDateSelection}
-                      disabled={!selectedStartDate || !selectedEndDate}
+                      disabled={!selectedStartDate || !selectedEndDate || (selectedEndDate && selectedStartDate && selectedEndDate <= selectedStartDate)}
                       className="w-full bg-blue-600 hover:bg-blue-700"
                     >
                       Confirm Dates
                     </Button>
+                    {selectedStartDate && selectedEndDate && selectedEndDate <= selectedStartDate && (
+                      <p className="text-xs text-red-500 text-center mt-2">
+                        End date must be after start date
+                      </p>
+                    )}
                   </div>
                 </Card>
               </div>

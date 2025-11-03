@@ -1,17 +1,19 @@
 import { ArrowLeft, Plus, Bell, Share2, Upload } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
+import { tripsApi, TripResponse } from '../utils/api';
 
 interface TripHistoryPageProps {
   onBack: () => void;
-  onViewTrip: (tripId: number) => void;
+  onViewTrip: (tripId: string) => void;
   onCreateNewTrip: () => void;
   onNotifications: () => void;
-  onTripSummary: (tripId: number) => void;
+  onTripSummary: (tripId: string) => void;
 }
 
 interface Trip {
-  id: number;
+  id: string;
   destination: string;
   dates: string;
   progress: number;
@@ -19,36 +21,43 @@ interface Trip {
 }
 
 export function TripHistoryPage({ onBack, onViewTrip, onCreateNewTrip, onNotifications, onTripSummary }: TripHistoryPageProps) {
-  const trips: Trip[] = [
-    {
-      id: 1,
-      destination: 'Trip to Dubai',
-      dates: '25.10-12.12',
-      progress: 35,
-      isPublished: false
-    },
-    {
-      id: 2,
-      destination: 'Trip to Turkey',
-      dates: '15.11-22.11',
-      progress: 80,
-      isPublished: true
-    },
-    {
-      id: 3,
-      destination: 'Trip to Bali',
-      dates: '01.10-08.10',
-      progress: 100,
-      isPublished: false
-    },
-    {
-      id: 4,
-      destination: 'Trip to Paris',
-      dates: '01.12-08.12',
-      progress: 60,
-      isPublished: false
+  const [trips, setTrips] = useState<Trip[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    fetchTrips();
+  }, []);
+
+  const fetchTrips = async () => {
+    try {
+      const response = await tripsApi.getTrips();
+      const formattedTrips: Trip[] = response.trips.map((trip: TripResponse) => {
+        const startDate = new Date(trip.start_date);
+        const endDate = new Date(trip.end_date);
+        const dates = `${startDate.getDate()}.${startDate.getMonth() + 1}-${endDate.getDate()}.${endDate.getMonth() + 1}`;
+        
+        // Calculate progress based on selected items (mock for now)
+        let progress = 0;
+        if (trip.selected_flight) progress += 25;
+        if (trip.selected_hotel) progress += 25;
+        if (trip.selected_entertainments && trip.selected_entertainments.length > 0) progress += 25;
+        if (trip.status === 'planned' || trip.status === 'active' || trip.status === 'completed') progress += 25;
+        
+        return {
+          id: trip.id,
+          destination: `Trip to ${trip.to_city}`,
+          dates,
+          progress,
+          isPublished: false // Not implemented in backend yet
+        };
+      });
+      setTrips(formattedTrips);
+    } catch (error) {
+      console.error('Failed to fetch trips:', error);
+    } finally {
+      setIsLoading(false);
     }
-  ];
+  };
 
   return (
     <div className="max-w-md mx-auto min-h-screen bg-white">
@@ -82,7 +91,20 @@ export function TripHistoryPage({ onBack, onViewTrip, onCreateNewTrip, onNotific
 
       {/* Trip List */}
       <div className="px-6 py-6 space-y-4">
-        {trips.map((trip) => (
+        {isLoading ? (
+          <div className="text-center py-8">
+            <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading trips...</p>
+          </div>
+        ) : trips.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-gray-600 mb-4">No trips yet. Create your first trip!</p>
+            <Button onClick={onCreateNewTrip} className="bg-gradient-to-r from-blue-600 to-purple-600">
+              Create New Trip
+            </Button>
+          </div>
+        ) : (
+          trips.map((trip) => (
           <Card 
             key={trip.id}
             className="p-4 cursor-pointer hover:shadow-md transition-shadow border-2"
@@ -149,7 +171,8 @@ export function TripHistoryPage({ onBack, onViewTrip, onCreateNewTrip, onNotific
               {trip.progress === 100 ? 'Create Trip Summary' : 'Trip Summary (Complete trip first)'}
             </Button>
           </Card>
-        ))}
+        ))
+        )}
       </div>
     </div>
   );

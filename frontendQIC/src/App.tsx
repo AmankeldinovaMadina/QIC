@@ -46,14 +46,26 @@ type PageType =
   | 'trip-summary-collage';
 
 function AppContent() {
-  const { user, login, isProfileComplete } = useAuth();
+  const { user, login, isProfileComplete, isLoading } = useAuth();
   const { favouritePlans, toggleFavourite } = useFavourites();
   const [currentPage, setCurrentPage] = useState<PageType>('main');
   const [tripData, setTripData] = useState<any>(null);
   const [selectedOptions, setSelectedOptions] = useState<any>(null);
   const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
-  const [selectedTripId, setSelectedTripId] = useState<number | null>(null);
+  const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
   const [tripSummaryData, setTripSummaryData] = useState<any>(null);
+
+  // Show loading while checking auth
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   // If not logged in, show login page
   if (!user) {
@@ -84,7 +96,7 @@ function AppContent() {
     setCurrentPage('popular-plan-detail');
   };
 
-  const handleTripSummary = (tripId: number) => {
+  const handleTripSummary = (tripId: string) => {
     setSelectedTripId(tripId);
     setCurrentPage('trip-summary-upload');
   };
