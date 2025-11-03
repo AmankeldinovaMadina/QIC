@@ -15,10 +15,12 @@ A FastAPI service that aggregates hidden places from OpenTripMap & OpenStreetMap
 - **Visa Requirement Check**: Check visa requirements between countries
 - **RapidAPI Integration**: Uses professional visa requirement data
 
-### ✈️ Flight AI Ranking
+### ✈️ Flight AI Ranking & Selection
 - **Intelligent Flight Ranking**: AI-powered flight comparison using OpenAI
 - **Smart Preferences**: Considers user preferences like price, duration, stops
 - **Pros/Cons Analysis**: Automatic generation of flight advantages and disadvantages
+- **Flight Selection**: Save your preferred flight to a trip
+- **Persistent Storage**: Selected flights are stored with complete details
 - **Fallback System**: Uses heuristic ranking when OpenAI is unavailable
 
 ## Setup
@@ -77,6 +79,24 @@ curl -X POST "http://localhost:8001/visa/rank/custom" \
 ```bash
 curl "http://localhost:8001/visa/check?passport=KZ&destination=KR"
 ```
+
+### Authentication Endpoints
+
+**Register a new user:**
+```bash
+curl -X POST "http://localhost:8001/api/v1/auth/register" \
+  -H "Content-Type: application/json" \
+  -d '{"username": "your_username"}'
+```
+
+**Login:**
+```bash
+curl -X POST "http://localhost:8001/api/v1/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{"username": "your_username"}'
+```
+
+Response includes `access_token` to use in subsequent requests.
 
 ### Flight AI Ranking
 Rank flight itineraries using AI-powered analysis:
@@ -141,6 +161,177 @@ curl -X POST "http://localhost:8001/api/v1/flights/ai-rank" \
       }
     ]
   }'
+```
+
+### Flight Selection
+Save a selected flight to your trip:
+
+```bash
+curl -X POST "http://localhost:8001/api/v1/flights/select" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -d '{
+    "trip_id": "856ab99f-ec37-4ea2-be53-de94026fba3a",
+    "flight_id": "flight_123_final",
+    "airline": "Delta",
+    "flight_number": "DL123",
+    "departure_airport": "JFK",
+    "arrival_airport": "LAX",
+    "departure_time": "2025-11-10T08:00:00",
+    "arrival_time": "2025-11-10T11:30:00",
+    "price": 350.00,
+    "currency": "USD",
+    "total_duration_min": 330,
+    "stops": 0,
+    "score": 1.0,
+    "title": "Direct morning flight",
+    "pros_keywords": ["direct", "convenient time"],
+    "cons_keywords": []
+  }'
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Flight Delta DL123 successfully added to trip",
+  "trip_id": "856ab99f-ec37-4ea2-be53-de94026fba3a",
+  "flight": {
+    "airline": "Delta",
+    "flight_number": "DL123",
+    "route": "JFK → LAX",
+    "price": "$350.0 USD",
+    "departure": "2025-11-10T08:00:00"
+  }
+}
+```
+
+**Get trip with selected flight:**
+```bash
+curl -X GET "http://localhost:8001/api/v1/trips/856ab99f-ec37-4ea2-be53-de94026fba3a" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+**Response includes:**
+```json
+{
+  "id": "856ab99f-ec37-4ea2-be53-de94026fba3a",
+  "from_city": "New York",
+  "to_city": "Los Angeles",
+  "start_date": "2025-12-01T00:00:00",
+  "end_date": "2025-12-05T00:00:00",
+  "selected_flight": {
+    "flight_id": "flight_123_final",
+    "airline": "Delta",
+    "flight_number": "DL123",
+    "departure_airport": "JFK",
+    "arrival_airport": "LAX",
+    "departure_time": "2025-11-10T08:00:00",
+    "arrival_time": "2025-11-10T11:30:00",
+    "price": 350.0,
+    "currency": "USD",
+    "total_duration_min": 330,
+    "stops": 0,
+    "score": 1.0,
+    "title": "Direct morning flight",
+    "pros_keywords": ["direct", "convenient time"],
+    "cons_keywords": []
+  }
+}
+```
+
+## Complete Flight Selection Workflow
+
+Here's a complete example of using the flight ranking and selection features:
+
+### Step 1: Register/Login
+```bash
+# Register a new user
+curl -X POST "http://localhost:8001/api/v1/auth/register" \
+  -H "Content-Type: application/json" \
+  -d '{"username": "traveler123"}'
+
+# Save the access_token from the response
+```
+
+### Step 2: Create a Trip
+```bash
+curl -X POST "http://localhost:8001/api/v1/trips" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -d '{
+    "from_city": "New York",
+    "to_city": "Los Angeles",
+    "start_date": "2025-12-01T00:00:00",
+    "end_date": "2025-12-05T00:00:00",
+    "transport": "flight",
+    "adults": 1,
+    "budget_max": 1000
+  }'
+
+# Save the trip_id from the response
+```
+
+### Step 3: Get AI Flight Rankings
+```bash
+curl -X POST "http://localhost:8001/api/v1/flights/ai-rank" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "search_id": "jfk_lax_search",
+    "preferences_prompt": "I prefer direct flights in the morning, price is important but comfort matters too",
+    "flights": [
+      {
+        "id": "delta_dl123",
+        "price": {"amount": 350, "currency": "USD"},
+        "total_duration_min": 330,
+        "stops": 0,
+        "legs": [{
+          "dep_iata": "JFK",
+          "dep_time": "2025-12-01T08:00:00",
+          "arr_iata": "LAX",
+          "arr_time": "2025-12-01T11:30:00",
+          "marketing": "Delta",
+          "flight_no": "DL123",
+          "duration_min": 330
+        }]
+      }
+    ]
+  }'
+
+# Review the AI-ranked results and choose your preferred flight
+```
+
+### Step 4: Select and Save Your Flight
+```bash
+curl -X POST "http://localhost:8001/api/v1/flights/select" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -d '{
+    "trip_id": "YOUR_TRIP_ID",
+    "flight_id": "delta_dl123",
+    "airline": "Delta",
+    "flight_number": "DL123",
+    "departure_airport": "JFK",
+    "arrival_airport": "LAX",
+    "departure_time": "2025-12-01T08:00:00",
+    "arrival_time": "2025-12-01T11:30:00",
+    "price": 350.00,
+    "currency": "USD",
+    "total_duration_min": 330,
+    "stops": 0,
+    "score": 0.95,
+    "title": "Direct morning flight",
+    "pros_keywords": ["direct", "morning departure", "good price"],
+    "cons_keywords": []
+  }'
+```
+
+### Step 5: Retrieve Your Trip with Flight Details
+```bash
+curl -X GET "http://localhost:8001/api/v1/trips/YOUR_TRIP_ID" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# Response will include all trip details plus the selected_flight object
 ```
 
 ## Configuration Notes

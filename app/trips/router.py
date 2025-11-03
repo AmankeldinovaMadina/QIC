@@ -68,7 +68,31 @@ async def get_trip(
             detail="Trip not found"
         )
     
-    return trip
+    # Build the selected flight info if it exists
+    selected_flight = trips_service._build_selected_flight_info(trip)
+    
+    # Create response with selected flight
+    return TripResponse(
+        id=trip.id,
+        user_id=trip.user_id,
+        from_city=trip.from_city,
+        to_city=trip.to_city,
+        start_date=trip.start_date,
+        end_date=trip.end_date,
+        transport=trip.transport,
+        adults=trip.adults,
+        children=trip.children,
+        budget_min=trip.budget_min,
+        budget_max=trip.budget_max,
+        entertainment_tags=trip.entertainment_tags,
+        notes=trip.notes,
+        status=trip.status,
+        timezone=trip.timezone,
+        ics_token=trip.ics_token,
+        created_at=trip.created_at,
+        updated_at=trip.updated_at,
+        selected_flight=selected_flight
+    )
 
 
 @router.patch("/{trip_id}", response_model=TripResponse)

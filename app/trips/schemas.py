@@ -9,6 +9,25 @@ from pydantic import BaseModel, Field, validator
 from app.db.models import TransportType, TripStatus
 
 
+class SelectedFlightInfo(BaseModel):
+    """Selected flight information for a trip."""
+    flight_id: str
+    airline: str
+    flight_number: str
+    departure_airport: str
+    arrival_airport: str
+    departure_time: datetime
+    arrival_time: datetime
+    price: float
+    currency: str
+    total_duration_min: int
+    stops: int
+    score: Optional[float] = None
+    title: Optional[str] = None
+    pros_keywords: Optional[List[str]] = None
+    cons_keywords: Optional[List[str]] = None
+
+
 class TripCreateRequest(BaseModel):
     """Trip creation request."""
     from_city: str = Field(..., min_length=1, max_length=100)
@@ -75,6 +94,9 @@ class TripResponse(BaseModel):
     ics_token: str
     created_at: datetime
     updated_at: Optional[datetime]
+    
+    # Selected flight information
+    selected_flight: Optional[SelectedFlightInfo] = None
 
     class Config:
         from_attributes = True
@@ -108,3 +130,30 @@ class TripChecklistResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class FlightSelectionRequest(BaseModel):
+    """Request to select a flight for a trip."""
+    trip_id: str
+    flight_id: str
+    airline: str
+    flight_number: str
+    departure_airport: str
+    arrival_airport: str
+    departure_time: datetime
+    arrival_time: datetime
+    price: float
+    currency: str
+    total_duration_min: int
+    stops: int
+    score: Optional[float] = None
+    title: Optional[str] = None
+    pros_keywords: Optional[List[str]] = None
+    cons_keywords: Optional[List[str]] = None
+
+
+class FlightSelectionResponse(BaseModel):
+    """Response after selecting a flight for a trip."""
+    success: bool
+    message: str
+    trip: TripResponse

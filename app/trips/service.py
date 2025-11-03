@@ -7,11 +7,34 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Trip, TripPlan, TripChecklist, TripStatus, User
-from app.trips.schemas import TripCreateRequest, TripUpdateRequest
+from app.trips.schemas import TripCreateRequest, TripUpdateRequest, SelectedFlightInfo
 
 
 class TripsService:
     """Service for trip management."""
+
+    def _build_selected_flight_info(self, trip: Trip) -> Optional[SelectedFlightInfo]:
+        """Build SelectedFlightInfo from trip model."""
+        if not trip.selected_flight_id:
+            return None
+        
+        return SelectedFlightInfo(
+            flight_id=trip.selected_flight_id,
+            airline=trip.selected_flight_airline,
+            flight_number=trip.selected_flight_number,
+            departure_airport=trip.selected_flight_departure_airport,
+            arrival_airport=trip.selected_flight_arrival_airport,
+            departure_time=trip.selected_flight_departure_time,
+            arrival_time=trip.selected_flight_arrival_time,
+            price=float(trip.selected_flight_price) if trip.selected_flight_price else 0.0,
+            currency=trip.selected_flight_currency or "USD",
+            total_duration_min=trip.selected_flight_duration_min or 0,
+            stops=trip.selected_flight_stops or 0,
+            score=float(trip.selected_flight_score) if trip.selected_flight_score else None,
+            title=trip.selected_flight_title,
+            pros_keywords=trip.selected_flight_pros,
+            cons_keywords=trip.selected_flight_cons
+        )
 
     async def create_trip(
         self, 
@@ -177,6 +200,40 @@ class TripsService:
         stmt = select(TripChecklist).where(TripChecklist.trip_id == trip_id)
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
+
+    async def select_flight_for_trip(
+        self,
+        session: AsyncSession,
+        trip_id: str,
+        user_id: str,
+        flight_data: dict
+    ) -> Optional[Trip]:
+        """Select and save flight information for a trip."""
+        trip = await self.get_trip_by_id(session, trip_id, user_id)
+        
+        if not trip:
+            return None
+        
+        # Update trip with selected flight information
+        trip.selected_flight_id = flight_data.get("flight_id")
+        trip.selected_flight_airline = flight_data.get("airline")
+        trip.selected_flight_number = flight_data.get("flight_number")
+        trip.selected_flight_departure_airport = flight_data.get("departure_airport")
+        trip.selected_flight_arrival_airport = flight_data.get("arrival_airport")
+        trip.selected_flight_departure_time = flight_data.get("departure_time")
+        trip.selected_flight_arrival_time = flight_data.get("arrival_time")
+        trip.selected_flight_price = flight_data.get("price")
+        trip.selected_flight_currency = flight_data.get("currency")
+        trip.selected_flight_duration_min = flight_data.get("total_duration_min")
+        trip.selected_flight_stops = flight_data.get("stops")
+        trip.selected_flight_score = flight_data.get("score")
+        trip.selected_flight_title = flight_data.get("title")
+        trip.selected_flight_pros = flight_data.get("pros_keywords")
+        trip.selected_flight_cons = flight_data.get("cons_keywords")
+        
+        await session.commit()
+        await session.refresh(trip)
+        return trip
 
 
 # Global service instance

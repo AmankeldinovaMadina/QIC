@@ -123,6 +123,23 @@ class Trip(Base):
     ics_token = Column(String(36), default=lambda: str(uuid.uuid4()))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Selected flight information
+    selected_flight_id = Column(String(255), nullable=True)
+    selected_flight_airline = Column(String(100), nullable=True)
+    selected_flight_number = Column(String(50), nullable=True)
+    selected_flight_departure_airport = Column(String(10), nullable=True)
+    selected_flight_arrival_airport = Column(String(10), nullable=True)
+    selected_flight_departure_time = Column(DateTime(timezone=True), nullable=True)
+    selected_flight_arrival_time = Column(DateTime(timezone=True), nullable=True)
+    selected_flight_price = Column(Numeric(10, 2), nullable=True)
+    selected_flight_currency = Column(String(10), nullable=True)
+    selected_flight_duration_min = Column(Integer, nullable=True)
+    selected_flight_stops = Column(Integer, nullable=True)
+    selected_flight_score = Column(Numeric(3, 2), nullable=True)
+    selected_flight_title = Column(String(255), nullable=True)
+    selected_flight_pros = Column(JSON, nullable=True)  # Array of pros keywords
+    selected_flight_cons = Column(JSON, nullable=True)  # Array of cons keywords
 
     # Relationships
     user = relationship("User", back_populates="trips")
