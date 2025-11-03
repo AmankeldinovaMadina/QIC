@@ -15,6 +15,12 @@ A FastAPI service that aggregates hidden places from OpenTripMap & OpenStreetMap
 - **Visa Requirement Check**: Check visa requirements between countries
 - **RapidAPI Integration**: Uses professional visa requirement data
 
+### ✈️ Flight AI Ranking
+- **Intelligent Flight Ranking**: AI-powered flight comparison using OpenAI
+- **Smart Preferences**: Considers user preferences like price, duration, stops
+- **Pros/Cons Analysis**: Automatic generation of flight advantages and disadvantages
+- **Fallback System**: Uses heuristic ranking when OpenAI is unavailable
+
 ## Setup
 
 1. **Install dependencies:**
@@ -26,6 +32,7 @@ A FastAPI service that aggregates hidden places from OpenTripMap & OpenStreetMap
    ```env
    OPENTRIPMAP_API_KEY=your_opentripmap_key_here
    RAPIDAPI_KEY=your_rapidapi_key_here
+   OPENAI_API_KEY=your_openai_key_here
    ```
 
 3. **Run the server:**
@@ -69,6 +76,71 @@ curl -X POST "http://localhost:8001/visa/rank/custom" \
 ### Check Visa Requirements
 ```bash
 curl "http://localhost:8001/visa/check?passport=KZ&destination=KR"
+```
+
+### Flight AI Ranking
+Rank flight itineraries using AI-powered analysis:
+
+```bash
+curl -X POST "http://localhost:8001/api/v1/flights/ai-rank" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "search_id": "demo_jfk_lax",
+    "preferences_prompt": "Avoid red-eye flights, prefer non-stop or max one stop, low price is important, but flight duration also matters.",
+    "locale": {
+      "currency": "USD",
+      "hl": "en",
+      "tz": "America/New_York"
+    },
+    "flights": [
+      {
+        "id": "flight_aa_nonstop",
+        "price": { "amount": 250, "currency": "USD" },
+        "total_duration_min": 360,
+        "stops": 0,
+        "emissions_kg": 420,
+        "legs": [
+          {
+            "dep_iata": "JFK",
+            "dep_time": "2025-12-15T08:00:00",
+            "arr_iata": "LAX",
+            "arr_time": "2025-12-15T11:00:00",
+            "marketing": "AA",
+            "flight_no": "AA100",
+            "duration_min": 360
+          }
+        ]
+      },
+      {
+        "id": "flight_ua_1stop",
+        "price": { "amount": 180, "currency": "USD" },
+        "total_duration_min": 480,
+        "stops": 1,
+        "emissions_kg": 510,
+        "layovers_min": 95,
+        "legs": [
+          {
+            "dep_iata": "JFK",
+            "dep_time": "2025-12-15T20:30:00",
+            "arr_iata": "ORD",
+            "arr_time": "2025-12-15T22:00:00",
+            "marketing": "UA",
+            "flight_no": "UA320",
+            "duration_min": 150
+          },
+          {
+            "dep_iata": "ORD",
+            "dep_time": "2025-12-16T01:00:00",
+            "arr_iata": "LAX",
+            "arr_time": "2025-12-16T03:30:00",
+            "marketing": "UA",
+            "flight_no": "UA321",
+            "duration_min": 150
+          }
+        ]
+      }
+    ]
+  }'
 ```
 
 ## Configuration Notes
@@ -119,18 +191,82 @@ Check your RapidAPI dashboard's "Endpoints" tab for the exact path and update th
 }
 ```
 
+### Flight AI Ranking
+```json
+{
+  "search_id": "demo_jfk_lax",
+  "ordered_ids": [
+    "flight_aa_nonstop",
+    "flight_ua_1stop"
+  ],
+  "items": [
+    {
+      "id": "flight_aa_nonstop",
+      "score": 0.9,
+      "title": "Non-stop Flight AA100: JFK to LAX",
+      "rationale_short": "Best option with no stops and reasonable duration, but slightly higher price.",
+      "pros_keywords": [
+        "non-stop",
+        "short duration",
+        "direct flight"
+      ],
+      "cons_keywords": [
+        "higher price than 1-stop"
+      ],
+      "tags": null
+    },
+    {
+      "id": "flight_ua_1stop",
+      "score": 0.7,
+      "title": "1-stop Flight UA320/UA321: JFK to LAX via ORD",
+      "rationale_short": "Lower price but longer duration and one stop, which may be less convenient.",
+      "pros_keywords": [
+        "lower price",
+        "1 stop",
+        "acceptable layover"
+      ],
+      "cons_keywords": [
+        "longer total duration",
+        "1 stop",
+        "late departure"
+      ],
+      "tags": null
+    }
+  ],
+  "meta": {
+    "used_model": "gpt-4o-mini",
+    "deterministic": true,
+    "notes": [
+      "Ranked based on user preferences for non-stop or minimal stops, price, and duration."
+    ]
+  }
+}
+```
+
 ## Production Notes
 
-- **Security**: Keep `RAPIDAPI_KEY` and `OPENTRIPMAP_API_KEY` in environment variables only
+- **Security**: Keep `RAPIDAPI_KEY`, `OPENTRIPMAP_API_KEY`, and `OPENAI_API_KEY` in environment variables only
 - **Caching**: Consider caching visa results (rules don't change frequently)
-- **Rate Limits**: Both APIs have rate limits; implement retry logic for production use
+- **Rate Limits**: All APIs have rate limits; implement retry logic for production use
 - **Error Handling**: 502 errors indicate upstream API issues; 500 errors are internal
+- **OpenAI Fallback**: Flight ranking automatically falls back to heuristic ranking when OpenAI is unavailable
 
 ## File Structure
 
 ```
 QIC/
 ├── app.py              # Main FastAPI application
+├── app/                # Modular application structure
+│   ├── main.py         # FastAPI app initialization
+│   ├── flights/        # Flight ranking module
+│   │   ├── ai_ranker.py # OpenAI flight ranking logic
+│   │   ├── router.py   # Flight endpoints
+│   │   └── schemas.py  # Flight data models
+│   ├── api/            # API routing
+│   ├── auth/           # Authentication module
+│   ├── trips/          # Trip management
+│   ├── core/           # Core settings and logging
+│   └── db/             # Database models
 ├── requirements.txt    # Python dependencies  
 ├── .env               # API keys (keep private!)
 └── README.md          # This file
