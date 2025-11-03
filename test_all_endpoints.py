@@ -1,6 +1,6 @@
 """
 Comprehensive test suite for all API endpoints.
-Tests authentication, trips, flights, and full workflow.
+Tests authentication, trips, flights, hotels, and full workflow.
 """
 
 import requests
@@ -473,7 +473,175 @@ def test_verify_flight_saved():
 
 
 # ============================================================================
-# TEST 13: Finalize Trip
+# TEST 13: Hotel AI Ranking
+# ============================================================================
+def test_hotel_ranking():
+    """Test AI hotel ranking endpoint."""
+    print_test("Hotel AI Ranking")
+    
+    try:
+        # Sample hotels data
+        payload = {
+            "search_id": "test_tokyo_hotels",
+            "preferences_prompt": "I prefer hotels near tourist attractions with good breakfast, free WiFi is important",
+            "hotels": [
+                {
+                    "id": "hotel_1",
+                    "name": "Tokyo Grand Hotel",
+                    "location": "Shinjuku, Tokyo",
+                    "price_per_night": 180.00,
+                    "total_price": 900.00,
+                    "currency": "USD",
+                    "rating": 4.5,
+                    "reviews_count": 1250,
+                    "hotel_class": 4,
+                    "property_type": "Hotel",
+                    "amenities": ["WiFi", "Breakfast", "Gym", "Pool", "Restaurant"],
+                    "free_cancellation": True
+                },
+                {
+                    "id": "hotel_2",
+                    "name": "Budget Stay Tokyo",
+                    "location": "Asakusa, Tokyo",
+                    "price_per_night": 80.00,
+                    "total_price": 400.00,
+                    "currency": "USD",
+                    "rating": 3.8,
+                    "reviews_count": 456,
+                    "hotel_class": 2,
+                    "property_type": "Hotel",
+                    "amenities": ["WiFi", "Breakfast"],
+                    "free_cancellation": False
+                },
+                {
+                    "id": "hotel_3",
+                    "name": "Luxury Palace Tokyo",
+                    "location": "Ginza, Tokyo",
+                    "price_per_night": 450.00,
+                    "total_price": 2250.00,
+                    "currency": "USD",
+                    "rating": 4.9,
+                    "reviews_count": 2890,
+                    "hotel_class": 5,
+                    "property_type": "Luxury Hotel",
+                    "amenities": ["WiFi", "Breakfast", "Gym", "Pool", "Spa", "Restaurant", "Bar", "Concierge"],
+                    "free_cancellation": True
+                }
+            ]
+        }
+        
+        response = requests.post(
+            f"{API_BASE}/hotels/rank",
+            json=payload
+        )
+        print_response(response)
+        
+        assert response.status_code == 200, "Hotel ranking failed"
+        data = response.json()
+        assert "items" in data, "No ranked items in response"
+        assert len(data["items"]) == 3, "Expected 3 ranked hotels"
+        
+        # Store top hotel for selection test
+        test_data["ranked_hotel"] = data["items"][0]
+        
+        print_success(f"Hotels ranked! Top choice: {data['items'][0]['title']}")
+        print_info(f"Score: {data['items'][0]['score']}")
+        print_info(f"Pros: {', '.join(data['items'][0]['pros_keywords'][:3])}")
+        
+        return True
+    except Exception as e:
+        print_error(f"Hotel ranking failed: {e}")
+        return False
+
+
+# ============================================================================
+# TEST 14: Select Hotel for Trip
+# ============================================================================
+def test_select_hotel():
+    """Test selecting a hotel and saving it to a trip."""
+    print_test("Select Hotel for Trip")
+    
+    try:
+        check_in = (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d")
+        check_out = (datetime.now() + timedelta(days=35)).strftime("%Y-%m-%d")
+        
+        payload = {
+            "trip_id": test_data["trip_id"],
+            "hotel_id": "hotel_1",
+            "hotel_name": "Tokyo Grand Hotel",
+            "location": "Shinjuku, Tokyo",
+            "price_per_night": 180.00,
+            "total_price": 900.00,
+            "currency": "USD",
+            "check_in_date": check_in,
+            "check_out_date": check_out,
+            "rating": 4.5,
+            "reviews_count": 1250,
+            "hotel_class": 4,
+            "amenities": ["WiFi", "Breakfast", "Gym", "Pool", "Restaurant"],
+            "free_cancellation": True,
+            "score": test_data["ranked_hotel"]["score"],
+            "title": test_data["ranked_hotel"]["title"],
+            "pros_keywords": test_data["ranked_hotel"]["pros_keywords"],
+            "cons_keywords": test_data["ranked_hotel"]["cons_keywords"]
+        }
+        
+        headers = {"Authorization": f"Bearer {test_data['access_token']}"}
+        response = requests.post(
+            f"{API_BASE}/hotels/select",
+            json=payload,
+            headers=headers
+        )
+        print_response(response)
+        
+        assert response.status_code == 200, "Hotel selection failed"
+        data = response.json()
+        assert data["success"] == True, "Selection not successful"
+        assert data["trip_id"] == test_data["trip_id"], "Trip ID mismatch"
+        
+        print_success("Hotel selected and saved to trip!")
+        return True
+    except Exception as e:
+        print_error(f"Hotel selection failed: {e}")
+        return False
+
+
+# ============================================================================
+# TEST 15: Verify Hotel Saved to Trip
+# ============================================================================
+def test_verify_hotel_saved():
+    """Test that the selected hotel is saved in the trip."""
+    print_test("Verify Hotel Saved to Trip")
+    
+    try:
+        headers = {"Authorization": f"Bearer {test_data['access_token']}"}
+        response = requests.get(
+            f"{API_BASE}/trips/{test_data['trip_id']}",
+            headers=headers
+        )
+        print_response(response)
+        
+        assert response.status_code == 200, "Get trip failed"
+        data = response.json()
+        assert "selected_hotel" in data, "No selected_hotel in response"
+        assert data["selected_hotel"] is not None, "selected_hotel is null"
+        assert data["selected_hotel"]["hotel_name"] == "Tokyo Grand Hotel", "Hotel name mismatch"
+        
+        hotel = data["selected_hotel"]
+        print_success("Hotel data verified in trip!")
+        print_info(f"Hotel: {hotel['hotel_name']}")
+        print_info(f"Location: {hotel['location']}")
+        print_info(f"Price: ${hotel['total_price']} ({hotel['currency']})")
+        print_info(f"Rating: {hotel['rating']}/5")
+        
+        return True
+    except Exception as e:
+        print_error(f"Hotel verification failed: {e}")
+        return False
+
+
+# ============================================================================
+# TEST 16: Finalize Trip
 # ============================================================================
 def test_finalize_trip():
     """Test finalizing a trip."""
@@ -499,7 +667,7 @@ def test_finalize_trip():
 
 
 # ============================================================================
-# TEST 14: Get Trip Plan
+# TEST 17: Get Trip Plan
 # ============================================================================
 def test_get_trip_plan():
     """Test getting trip plan."""
@@ -525,7 +693,7 @@ def test_get_trip_plan():
 
 
 # ============================================================================
-# TEST 15: Get Trip Checklist
+# TEST 18: Get Trip Checklist
 # ============================================================================
 def test_get_trip_checklist():
     """Test getting trip checklist."""
@@ -551,7 +719,7 @@ def test_get_trip_checklist():
 
 
 # ============================================================================
-# TEST 16: Delete Trip (Optional - cleanup)
+# TEST 19: Delete Trip (Optional - cleanup)
 # ============================================================================
 def test_delete_trip():
     """Test deleting a trip."""
@@ -598,6 +766,9 @@ def run_all_tests():
         ("Flight AI Ranking", test_flight_ranking),
         ("Select Flight", test_select_flight),
         ("Verify Flight Saved", test_verify_flight_saved),
+        ("Hotel AI Ranking", test_hotel_ranking),
+        ("Select Hotel", test_select_hotel),
+        ("Verify Hotel Saved", test_verify_hotel_saved),
         ("Finalize Trip", test_finalize_trip),
         ("Get Trip Plan", test_get_trip_plan),
         ("Get Trip Checklist", test_get_trip_checklist),

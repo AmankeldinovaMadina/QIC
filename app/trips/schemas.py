@@ -28,6 +28,11 @@ class SelectedFlightInfo(BaseModel):
     cons_keywords: Optional[List[str]] = None
 
 
+# Import SelectedHotelInfo from hotels module at the top level for use in TripResponse
+# This will be set after hotels module is loaded
+SelectedHotelInfo = None
+
+
 class TripCreateRequest(BaseModel):
     """Trip creation request."""
     from_city: str = Field(..., min_length=1, max_length=100)
@@ -97,6 +102,9 @@ class TripResponse(BaseModel):
     
     # Selected flight information
     selected_flight: Optional[SelectedFlightInfo] = None
+    
+    # Selected hotel information (will be Optional[SelectedHotelInfo])
+    selected_hotel: Optional[dict] = None  # Using dict for now to avoid circular import
 
     class Config:
         from_attributes = True

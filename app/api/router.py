@@ -5,6 +5,8 @@ from fastapi import APIRouter
 from app.auth import auth_router
 from app.flights import flights_router
 from app.trips import trips_router
+from app.hotels import hotels_router
+from app.culture import culture_router
 
 # Create main API router
 api_router = APIRouter(prefix="/api/v1")
@@ -13,6 +15,8 @@ api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(auth_router)
 api_router.include_router(trips_router)
 api_router.include_router(flights_router)
+api_router.include_router(hotels_router)
+api_router.include_router(culture_router)
 
 
 # Health check endpoint

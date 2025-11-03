@@ -71,7 +71,10 @@ async def get_trip(
     # Build the selected flight info if it exists
     selected_flight = trips_service._build_selected_flight_info(trip)
     
-    # Create response with selected flight
+    # Build the selected hotel info if it exists (returns dict directly)
+    selected_hotel = trips_service._build_selected_hotel_info(trip)
+    
+    # Create response with selected flight and hotel
     return TripResponse(
         id=trip.id,
         user_id=trip.user_id,
@@ -91,7 +94,8 @@ async def get_trip(
         ics_token=trip.ics_token,
         created_at=trip.created_at,
         updated_at=trip.updated_at,
-        selected_flight=selected_flight
+        selected_flight=selected_flight,
+        selected_hotel=selected_hotel
     )
 
 

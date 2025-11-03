@@ -23,6 +23,15 @@ A FastAPI service that aggregates hidden places from OpenTripMap & OpenStreetMap
 - **Persistent Storage**: Selected flights are stored with complete details
 - **Fallback System**: Uses heuristic ranking when OpenAI is unavailable
 
+### 🏨 Hotel AI Ranking & Selection
+- **Google Hotels Integration**: Search hotels via SerpApi Google Hotels API
+- **AI-Powered Hotel Ranking**: Intelligent hotel comparison using OpenAI
+- **Smart Filtering**: Location, price, rating, amenities, and user preferences
+- **Hotel Selection**: Save your preferred hotel to a trip
+- **Detailed Information**: Ratings, reviews, amenities, cancellation policies
+- **Property Details**: Get detailed information for specific hotels
+- **Fallback System**: Heuristic ranking when OpenAI is unavailable
+
 ## Setup
 
 1. **Install dependencies:**
@@ -35,6 +44,7 @@ A FastAPI service that aggregates hidden places from OpenTripMap & OpenStreetMap
    OPENTRIPMAP_API_KEY=your_opentripmap_key_here
    RAPIDAPI_KEY=your_rapidapi_key_here
    OPENAI_API_KEY=your_openai_key_here
+   SERPAPI_KEY=your_serpapi_key_here
    ```
 
 3. **Run the server:**
@@ -334,7 +344,155 @@ curl -X GET "http://localhost:8001/api/v1/trips/YOUR_TRIP_ID" \
 # Response will include all trip details plus the selected_flight object
 ```
 
+## Complete Hotel Selection Workflow
+
+Here's a complete example of using the hotel ranking and selection features:
+
+### Step 1: AI Hotel Ranking
+```bash
+curl -X POST "http://localhost:8001/api/v1/hotels/rank" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "search_id": "tokyo_hotels_search",
+    "preferences_prompt": "I prefer hotels near tourist attractions with good breakfast, free WiFi is important",
+    "hotels": [
+      {
+        "id": "hotel_1",
+        "name": "Tokyo Grand Hotel",
+        "location": "Shinjuku, Tokyo",
+        "price_per_night": 180.00,
+        "total_price": 900.00,
+        "currency": "USD",
+        "rating": 4.5,
+        "reviews_count": 1250,
+        "hotel_class": 4,
+        "property_type": "Hotel",
+        "amenities": ["WiFi", "Breakfast", "Gym", "Pool", "Restaurant"],
+        "free_cancellation": true
+      },
+      {
+        "id": "hotel_2",
+        "name": "Budget Inn Tokyo",
+        "location": "Asakusa, Tokyo",
+        "price_per_night": 80.00,
+        "total_price": 400.00,
+        "currency": "USD",
+        "rating": 3.8,
+        "reviews_count": 456,
+        "hotel_class": 2,
+        "amenities": ["WiFi", "Breakfast"],
+        "free_cancellation": false
+      }
+    ]
+  }'
+```
+
+**Response:**
+```json
+{
+  "search_id": "tokyo_hotels_search",
+  "ordered_ids": ["hotel_1", "hotel_2"],
+  "items": [
+    {
+      "id": "hotel_1",
+      "score": 0.92,
+      "title": "Tokyo Grand Hotel - Comfortable Stay in Shinjuku",
+      "rationale_short": "Excellent location with high ratings and great amenities",
+      "pros_keywords": ["great location", "high rating", "free WiFi", "good breakfast"],
+      "cons_keywords": ["higher price"]
+    }
+  ],
+  "meta": {
+    "used_model": "gpt-4o-mini",
+    "deterministic": true
+  }
+}
+```
+
+### Step 2: Select and Save Hotel to Trip
+```bash
+curl -X POST "http://localhost:8001/api/v1/hotels/select" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -d '{
+    "trip_id": "YOUR_TRIP_ID",
+    "hotel_id": "hotel_1",
+    "hotel_name": "Tokyo Grand Hotel",
+    "location": "Shinjuku, Tokyo",
+    "price_per_night": 180.00,
+    "total_price": 900.00,
+    "currency": "USD",
+    "check_in_date": "2025-12-01",
+    "check_out_date": "2025-12-06",
+    "rating": 4.5,
+    "reviews_count": 1250,
+    "hotel_class": 4,
+    "amenities": ["WiFi", "Breakfast", "Gym", "Pool", "Restaurant"],
+    "free_cancellation": true,
+    "score": 0.92,
+    "title": "Tokyo Grand Hotel - Comfortable Stay in Shinjuku",
+    "pros_keywords": ["great location", "high rating", "free WiFi"],
+    "cons_keywords": ["higher price"]
+  }'
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Hotel Tokyo Grand Hotel successfully added to your trip",
+  "trip_id": "YOUR_TRIP_ID",
+  "hotel": {
+    "name": "Tokyo Grand Hotel",
+    "location": "Shinjuku, Tokyo",
+    "price": "$900.0 USD ($180.0/night)",
+    "rating": "4.5/5",
+    "check_in": "2025-12-01",
+    "check_out": "2025-12-06"
+  }
+}
+```
+
+### Step 3: Retrieve Trip with Hotel Details
+```bash
+curl -X GET "http://localhost:8001/api/v1/trips/YOUR_TRIP_ID" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+**Response includes:**
+```json
+{
+  "id": "YOUR_TRIP_ID",
+  "from_city": "New York",
+  "to_city": "Tokyo",
+  "selected_flight": { ... },
+  "selected_hotel": {
+    "hotel_id": "hotel_1",
+    "hotel_name": "Tokyo Grand Hotel",
+    "location": "Shinjuku, Tokyo",
+    "price_per_night": 180.0,
+    "total_price": 900.0,
+    "currency": "USD",
+    "check_in_date": "2025-12-01",
+    "check_out_date": "2025-12-06",
+    "rating": 4.5,
+    "reviews_count": 1250,
+    "hotel_class": 4,
+    "amenities": ["WiFi", "Breakfast", "Gym", "Pool", "Restaurant"],
+    "free_cancellation": true,
+    "score": 0.92,
+    "pros_keywords": ["great location", "high rating", "free WiFi"],
+    "cons_keywords": ["higher price"]
+  }
+}
+```
+
 ## Configuration Notes
+
+### SerpApi Setup
+1. Get your API key from [SerpApi](https://serpapi.com/)
+2. Add it to `.env` as `SERPAPI_KEY=your_key_here`
+3. Used for Google Hotels search integration
 
 ### RapidAPI Setup
 1. Get your API key from [RapidAPI visa-requirement service](https://rapidapi.com/hub)

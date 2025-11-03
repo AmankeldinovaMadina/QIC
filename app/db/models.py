@@ -140,6 +140,26 @@ class Trip(Base):
     selected_flight_title = Column(String(255), nullable=True)
     selected_flight_pros = Column(JSON, nullable=True)  # Array of pros keywords
     selected_flight_cons = Column(JSON, nullable=True)  # Array of cons keywords
+    
+    # Selected hotel information
+    selected_hotel_id = Column(String(255), nullable=True)
+    selected_hotel_name = Column(String(255), nullable=True)
+    selected_hotel_location = Column(String(500), nullable=True)
+    selected_hotel_price_per_night = Column(Numeric(10, 2), nullable=True)
+    selected_hotel_total_price = Column(Numeric(10, 2), nullable=True)
+    selected_hotel_currency = Column(String(10), nullable=True)
+    selected_hotel_check_in = Column(String(50), nullable=True)
+    selected_hotel_check_out = Column(String(50), nullable=True)
+    selected_hotel_rating = Column(Numeric(3, 2), nullable=True)
+    selected_hotel_reviews_count = Column(Integer, nullable=True)
+    selected_hotel_class = Column(Integer, nullable=True)
+    selected_hotel_amenities = Column(JSON, nullable=True)  # Array of amenities
+    selected_hotel_free_cancellation = Column(Boolean, nullable=True)
+    selected_hotel_score = Column(Numeric(3, 2), nullable=True)
+    selected_hotel_title = Column(String(255), nullable=True)
+    selected_hotel_pros = Column(JSON, nullable=True)  # Array of pros keywords
+    selected_hotel_cons = Column(JSON, nullable=True)  # Array of cons keywords
+    selected_hotel_thumbnail = Column(String(1000), nullable=True)
 
     # Relationships
     user = relationship("User", back_populates="trips")

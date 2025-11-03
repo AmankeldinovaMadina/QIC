@@ -35,6 +35,33 @@ class TripsService:
             pros_keywords=trip.selected_flight_pros,
             cons_keywords=trip.selected_flight_cons
         )
+    
+    def _build_selected_hotel_info(self, trip: Trip) -> Optional[dict]:
+        """Build selected hotel info dict from trip model."""
+        if not trip.selected_hotel_id:
+            return None
+        
+        # Return as dict to avoid circular import
+        return {
+            "hotel_id": trip.selected_hotel_id,
+            "hotel_name": trip.selected_hotel_name,
+            "location": trip.selected_hotel_location,
+            "price_per_night": float(trip.selected_hotel_price_per_night) if trip.selected_hotel_price_per_night else 0.0,
+            "total_price": float(trip.selected_hotel_total_price) if trip.selected_hotel_total_price else 0.0,
+            "currency": trip.selected_hotel_currency or "USD",
+            "check_in_date": trip.selected_hotel_check_in,
+            "check_out_date": trip.selected_hotel_check_out,
+            "rating": float(trip.selected_hotel_rating) if trip.selected_hotel_rating else None,
+            "reviews_count": trip.selected_hotel_reviews_count,
+            "hotel_class": trip.selected_hotel_class,
+            "amenities": trip.selected_hotel_amenities,
+            "free_cancellation": trip.selected_hotel_free_cancellation,
+            "score": float(trip.selected_hotel_score) if trip.selected_hotel_score else None,
+            "title": trip.selected_hotel_title,
+            "pros_keywords": trip.selected_hotel_pros,
+            "cons_keywords": trip.selected_hotel_cons,
+            "thumbnail": trip.selected_hotel_thumbnail
+        }
 
     async def create_trip(
         self, 
