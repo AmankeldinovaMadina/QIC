@@ -3,18 +3,11 @@
 import os
 from typing import Optional
 from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
     """Application settings with environment variable support."""
-    
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        case_sensitive=False,
-        extra="ignore"
-    )
     
     # Database
     database_url: str = Field(
@@ -49,17 +42,11 @@ class Settings(BaseSettings):
     # External APIs
     google_flights_base_url: str = "https://www.googleapis.com/travel/v1"
     google_maps_base_url: str = "https://maps.googleapis.com/maps/api/v1"
-
-
-    @property
-    def OPENAI_API_KEY(self) -> Optional[str]:
-        """Get OpenAI API key."""
-        return self.openai_api_key
     
-    @property 
-    def SERPAPI_KEY(self) -> Optional[str]:
-        """Get SerpApi key."""
-        return self.serpapi_key
+    class Config:
+        env_file = ".env"
+        case_sensitive = False
+
 
 # Global settings instance
 settings = Settings()

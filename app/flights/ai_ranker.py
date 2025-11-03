@@ -14,106 +14,129 @@ class OpenAIFlightRanker:
     
     def __init__(self):
         from app.core.settings import settings
-        if not settings.OPENAI_API_KEY:
+        print(f"DEBUG: openai_api_key exists: {bool(settings.openai_api_key)}")
+        print(f"DEBUG: openai_api_key starts with: {settings.openai_api_key[:10] if settings.openai_api_key else 'None'}...")
+        if not settings.openai_api_key:
             raise RuntimeError("OPENAI_API_KEY missing. Ensure .env is loaded in the app process.")
-        self.client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+        self.client = AsyncOpenAI(api_key=settings.openai_api_key)
         self.model = getattr(settings, "OPENAI_MODEL", None) or "gpt-4o-mini"
+        print(f"DEBUG: OpenAI client initialized successfully")
         
     async def rank_flights(self, request: RankRequest) -> RankResponse:
         """Rank flights using OpenAI with structured output."""
+        # Limit to 30 flights for cost control
         limited_flights = request.flights[:30]
+        
         try:
+            print(f"DEBUG: Attempting to call OpenAI for {len(limited_flights)} flights")
+            # Call OpenAI with JSON schema
             response = await self._call_openai(request, limited_flights)
+            
+            print(f"DEBUG: OpenAI call successful")
+            # Validate and return
             return self._parse_openai_response(response, request.search_id)
+            
         except Exception as e:
-            import traceback, sys
-            print("OpenAI ranking failed:", repr(e), file=sys.stderr)
-            traceback.print_exc()
+            print(f"OpenAI ranking failed: {e}")
+            # Fallback to heuristic ranking
+            return self._heuristic_ranking(request)
+        limited_flights = request.flights[:30]
+        
+        try:
+            # Call OpenAI with JSON schema
+            response = await self._call_openai(request, limited_flights)
+            
+            # Validate and return
+            return self._parse_openai_response(response, request.search_id)
+            
+        except Exception as e:
+            print(f"OpenAI ranking failed: {e}")
+            # Fallback to heuristic ranking
             return self._heuristic_ranking(request)
     
     async def _call_openai(self, request: RankRequest, flights: List[Itinerary]) -> Dict[str, Any]:
-        """Call OpenAI API with structured JSON schema using Responses API."""
+        """Call OpenAI API with structured JSON schema."""
         
+        # Define the JSON schema for response
         response_schema = {
             "type": "object",
             "required": ["ordered_ids", "items", "meta"],
-            "additionalProperties": False,
             "properties": {
-                "ordered_ids": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+                "ordered_ids": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "minItems": 1
+                },
                 "items": {
                     "type": "array",
                     "items": {
                         "type": "object",
-                        # --- FIX #1: Added "tags" to this 'required' list ---
-                        "required": ["id","score","title","rationale_short","pros_keywords","cons_keywords","tags"],
-                        "additionalProperties": False,
+                        "required": ["id", "score", "title", "rationale_short", "pros_keywords", "cons_keywords"],
                         "properties": {
                             "id": {"type": "string"},
                             "score": {"type": "number", "minimum": 0, "maximum": 1},
                             "title": {"type": "string", "maxLength": 140},
                             "rationale_short": {"type": "string", "maxLength": 240},
-                            "pros_keywords": {"type": "array","items":{"type":"string"},"maxItems":8},
-                            "cons_keywords": {"type": "array","items":{"type":"string"},"maxItems":8},
-                            "tags": {"type":["array","null"],"items":{"type":"string"},"maxItems":5}
-                        }
+                            "pros_keywords": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "maxItems": 8
+                            },
+                            "cons_keywords": {
+                                "type": "array", 
+                                "items": {"type": "string"},
+                                "maxItems": 8
+                            }
+                        },
+                        "additionalProperties": False
                     }
                 },
                 "meta": {
                     "type": "object",
-                    # --- FIX #2: Added "notes" to this 'required' list ---
                     "required": ["used_model", "deterministic", "notes"],
-                    "additionalProperties": False,
                     "properties": {
                         "used_model": {"type": "string"},
                         "deterministic": {"type": "boolean"},
-                        "notes": {"type":["array","null"],"items":{"type":"string"}}
-                    }
+                        "notes": {
+                            "type": "array",
+                            "items": {"type": "string"}
+                        }
+                    },
+                    "additionalProperties": False
                 }
-            }
+            },
+            "additionalProperties": False
         }
-
+        
+        # Build system prompt
         system_prompt = self._build_system_prompt()
-        user_prompt   = self._build_user_prompt(request, flights)
-
-        try:
-            # Use Chat Completions API with structured outputs (response_format)
-            completion = await self.client.chat.completions.create(
-                model=self.model,
-                temperature=0.1,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                response_format={
-                    "type": "json_schema",
-                    "json_schema": {
-                        "name": "FlightRankResult",
-                        "schema": response_schema,
-                        "strict": True
-                    }
+        
+        # Build user prompt with flight data
+        user_prompt = self._build_user_prompt(request, flights)
+        
+        # Call OpenAI
+        completion = await self.client.chat.completions.create(
+            model=self.model,
+            temperature=0.2,
+            top_p=0.9,
+            seed=42,  # For reproducibility
+            response_format={
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "FlightRankResult",
+                    "schema": response_schema,
+                    "strict": True
                 }
-            )
-        except Exception as e:
-            # Bubble a clear error so rank_flights() fallback logs it
-            raise RuntimeError(f"OpenAI Chat Completions API call failed: {e}")
-
-        # Check for refusal
-        message = completion.choices[0].message
-        if hasattr(message, 'refusal') and message.refusal:
-            raise RuntimeError(f"OpenAI refused the request: {message.refusal}")
+            },
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ]
+        )
         
-        # Extract content
-        content = message.content
-        
-        if not content:
-            raise RuntimeError("OpenAI returned empty content (no text to parse)")
-
-        try:
-            return json.loads(content)
-        except Exception as parse_err:
-            # Log first 500 chars for diagnosis
-            snippet = content[:500].replace("\n", "\\n")
-            raise ValueError(f"Model returned non-JSON or schema-invalid text: {snippet}") from parse_err
+        # Parse response
+        content = completion.choices[0].message.content
+        return json.loads(content)
     
     def _build_system_prompt(self) -> str:
         """Build system prompt for flight ranking."""
@@ -139,7 +162,7 @@ Return ONLY valid JSON matching the exact schema."""
     
     def _build_user_prompt(self, request: RankRequest, flights: List[Itinerary]) -> str:
         """Build user prompt with preferences and flight data."""
-        locale = request.locale or {}
+        locale = request.locale
         
         # Prepare compact flight data for the model
         flight_data = []
@@ -172,9 +195,9 @@ Return ONLY valid JSON matching the exact schema."""
         prompt_data = {
             "preferences_prompt": request.preferences_prompt,
             "locale": {
-                "hl": locale.hl or "en",
-                "currency": locale.currency or "USD",
-                "tz": locale.tz
+                "hl": locale.hl if locale else "en",
+                "currency": locale.currency if locale else "USD",
+                "tz": locale.tz if locale else None
             },
             "flights": flight_data
         }
@@ -335,5 +358,7 @@ Return ONLY valid JSON matching the exact schema."""
         return f"{stops_text} • {duration_text} • {airline_text} • {price_text}"
 
 
-# Global instance
-openai_flight_ranker = OpenAIFlightRanker()
+# Do NOT create a global OpenAIFlightRanker instance at import time.
+# Instantiating the ranker may access settings and API keys and should be
+# done lazily inside request handlers or startup events to avoid import-time
+# failures when environment variables are not loaded or named differently.
