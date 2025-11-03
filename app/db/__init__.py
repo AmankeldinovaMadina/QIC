@@ -25,6 +25,7 @@ __all__ = [
     "TripPlan",
     "TripChecklist",
     "CultureTip",
+    "CultureGuide",
     "GoogleAccount",
     "GoogleToken",
     "CalendarBinding",

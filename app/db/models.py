@@ -370,6 +370,20 @@ class CultureTip(Base):
     )
 
 
+class CultureGuide(Base):
+    __tablename__ = "culture_guides"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    trip_id = Column(String(36), ForeignKey("trips.id"), nullable=False, unique=True, index=True)
+    destination = Column(String(255), nullable=False)
+    summary = Column(Text, nullable=False)
+    tips_json = Column(JSON, nullable=False)  # Store the array of tips as JSON
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
 # Calendar integration models
 class GoogleAccount(Base):
     __tablename__ = "google_accounts"
