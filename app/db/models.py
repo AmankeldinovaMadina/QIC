@@ -161,11 +161,17 @@ class Trip(Base):
     selected_hotel_cons = Column(JSON, nullable=True)  # Array of cons keywords
     selected_hotel_thumbnail = Column(String(1000), nullable=True)
 
+    # Selected entertainments information (array of entertainment venues)
+    selected_entertainments = Column(
+        JSON, nullable=True
+    )  # Array of entertainment objects
+
     # Relationships
     user = relationship("User", back_populates="trips")
     flight_searches = relationship("FlightSearch", back_populates="trip")
     hotel_searches = relationship("HotelSearch", back_populates="trip")
     activity_searches = relationship("ActivitySearch", back_populates="trip")
+    entertainment_selections = relationship("EntertainmentSelection", back_populates="trip")
     itinerary_items = relationship("ItineraryItem", back_populates="trip")
 
 
@@ -283,6 +289,36 @@ class Activity(Base):
 
     # Relationships
     search = relationship("ActivitySearch", back_populates="activities")
+
+
+class EntertainmentSelection(Base):
+    __tablename__ = "entertainment_selections"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    trip_id = Column(String(36), ForeignKey("trips.id"), nullable=False)
+    venue_id = Column(String(255), nullable=False)  # Google Maps place_id
+    venue_name = Column(String(255), nullable=False)
+    venue_type = Column(String(100), nullable=True)
+    address = Column(String(500), nullable=True)
+    rating = Column(Numeric(3, 2), nullable=True)
+    reviews_count = Column(Integer, nullable=True)
+    price_level = Column(String(10), nullable=True)  # $, $$, $$$, $$$$
+    latitude = Column(Numeric(10, 7), nullable=True)
+    longitude = Column(Numeric(10, 7), nullable=True)
+    website = Column(String(1000), nullable=True)
+    phone = Column(String(50), nullable=True)
+    opening_hours = Column(JSON, nullable=True)
+    types = Column(JSON, nullable=True)  # Array of venue types
+    description = Column(Text, nullable=True)
+    thumbnail = Column(String(1000), nullable=True)
+    score = Column(Numeric(3, 2), nullable=True)  # AI-generated score
+    title = Column(String(255), nullable=True)  # AI-generated title
+    pros_keywords = Column(JSON, nullable=True)  # Array of pros
+    cons_keywords = Column(JSON, nullable=True)  # Array of cons
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    trip = relationship("Trip", back_populates="entertainment_selections")
 
 
 class ItineraryItem(Base):

@@ -90,8 +90,8 @@ class TripPlan(BaseModel):
     children: int = 0
     budget_tier: Literal["budget", "mid", "luxury"] = "mid"
     preferences: List[str] = Field(default_factory=list)
-    diet: List[Literal["halal", "vegetarian", "gluten_free", "no_restrictions"]] = Field(
-        default_factory=lambda: ["no_restrictions"]
+    diet: List[Literal["halal", "vegetarian", "gluten_free", "no_restrictions"]] = (
+        Field(default_factory=lambda: ["no_restrictions"])
     )
     avoid_patterns: bool = True
     pacing: Literal["chill", "balanced", "intense"] = "balanced"
@@ -151,12 +151,16 @@ def _build_planning_context(trip: Trip) -> Dict[str, Any]:
     if trip.selected_flight_airline:
         flight_event = {
             "title": f"Flight {trip.selected_flight_airline} {trip.selected_flight_number}",
-            "start": trip.selected_flight_departure_time.isoformat()
-            if trip.selected_flight_departure_time
-            else "",
-            "end": trip.selected_flight_arrival_time.isoformat()
-            if trip.selected_flight_arrival_time
-            else "",
+            "start": (
+                trip.selected_flight_departure_time.isoformat()
+                if trip.selected_flight_departure_time
+                else ""
+            ),
+            "end": (
+                trip.selected_flight_arrival_time.isoformat()
+                if trip.selected_flight_arrival_time
+                else ""
+            ),
             "location_name": f"{trip.selected_flight_departure_airport} to {trip.selected_flight_arrival_airport}",
             "notes": f"Flight from {trip.selected_flight_departure_airport} to {trip.selected_flight_arrival_airport}",
             "transport_reco": "plane",
@@ -177,6 +181,34 @@ def _build_planning_context(trip: Trip) -> Dict[str, Any]:
             context["notes"] += f"\n\n{hotel_note}"
         else:
             context["notes"] = hotel_note
+
+    # Add selected entertainment venues if available
+    if trip.selected_entertainments and len(trip.selected_entertainments) > 0:
+        entertainment_notes = "\n\nSelected Entertainment Venues (user wants to visit these):\n"
+        for i, ent_data in enumerate(trip.selected_entertainments, 1):
+            if isinstance(ent_data, dict):
+                venue = ent_data.get("venue", {})
+                ranking = ent_data.get("ranking", {})
+                
+                venue_name = venue.get("title", "Unknown")
+                venue_type = venue.get("type", "")
+                address = venue.get("address", "")
+                rating = venue.get("rating", "")
+                pros = ranking.get("pros_keywords", [])
+                
+                entertainment_notes += f"{i}. {venue_name}"
+                if venue_type:
+                    entertainment_notes += f" ({venue_type})"
+                if rating:
+                    entertainment_notes += f" - {rating}★"
+                entertainment_notes += f"\n   Address: {address}\n"
+                if pros:
+                    entertainment_notes += f"   Highlights: {', '.join(pros[:4])}\n"
+        
+        if context.get("notes"):
+            context["notes"] += entertainment_notes
+        else:
+            context["notes"] = entertainment_notes
 
     return context
 
@@ -226,7 +258,9 @@ def _normalize_trip_plan(plan: TripPlan) -> TripPlan:
 
             # Normalize priority
             if ev.priority:
-                vv = PRIORITY_SYNONYMS.get(ev.priority.strip().lower(), ev.priority.strip().lower())
+                vv = PRIORITY_SYNONYMS.get(
+                    ev.priority.strip().lower(), ev.priority.strip().lower()
+                )
                 if vv not in PRIORITY_CANON:
                     ev.priority = "essential"  # type: ignore
                 else:

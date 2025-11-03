@@ -5,6 +5,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ai.planner import generate_trip_plan
 from app.auth import get_current_user
 from app.db import User, get_async_session
 from app.db.models import TripStatus
@@ -17,7 +18,6 @@ from app.trips.schemas import (
     TripUpdateRequest,
 )
 from app.trips.service import trips_service
-from app.ai.planner import generate_trip_plan
 
 router = APIRouter(prefix="/trips", tags=["trips"])
 
@@ -69,6 +69,18 @@ async def get_trip(
     # Build the selected hotel info if it exists (returns dict directly)
     selected_hotel = trips_service._build_selected_hotel_info(trip)
 
+    # Parse selected_entertainments JSON if it exists
+    selected_entertainments = None
+    if trip.selected_entertainments:
+        if isinstance(trip.selected_entertainments, str):
+            import json
+            try:
+                selected_entertainments = json.loads(trip.selected_entertainments)
+            except:
+                selected_entertainments = []
+        elif isinstance(trip.selected_entertainments, list):
+            selected_entertainments = trip.selected_entertainments
+
     # Create response with selected flight and hotel
     return TripResponse(
         id=trip.id,
@@ -91,6 +103,7 @@ async def get_trip(
         updated_at=trip.updated_at,
         selected_flight=selected_flight,
         selected_hotel=selected_hotel,
+        selected_entertainments=selected_entertainments,
     )
 
 
@@ -139,7 +152,7 @@ async def finalize_trip(
 ):
     """
     Finalize a trip and generate AI-powered daily plan.
-    
+
     This endpoint:
     1. Validates the trip belongs to the user
     2. Generates a detailed daily itinerary using OpenAI Structured Outputs
@@ -149,25 +162,25 @@ async def finalize_trip(
     """
     # First, get the trip to pass to AI planner
     trip = await trips_service.get_trip_by_id(session, trip_id, current_user.id)
-    
+
     if not trip:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Trip not found",
         )
-    
+
     if trip.status == TripStatus.PLANNED:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Trip is already finalized",
         )
-    
+
     try:
         # Generate AI-powered trip plan using OpenAI Structured Outputs
         print(f"Generating AI plan for trip {trip_id}...")
         plan_json = generate_trip_plan(trip)
         print(f"Plan generated successfully. Keys: {list(plan_json.keys())}")
-        
+
         # Generate a simple checklist (can be enhanced with AI later)
         checklist_json = {
             "pre_trip": [
@@ -198,23 +211,24 @@ async def finalize_trip(
                 "Monitor weather and local news",
             ],
         }
-        
+
         # Save plan and finalize trip
         finalized_trip = await trips_service.finalize_trip(
             session, trip_id, current_user.id, plan_json, checklist_json
         )
-        
+
         if not finalized_trip:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Trip not found or cannot be finalized",
             )
-        
+
         return finalized_trip
-        
+
     except Exception as e:
         # Log the error and return a helpful message
         import traceback
+
         print(f"Error generating trip plan: {str(e)}")
         print(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(

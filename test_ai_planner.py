@@ -3,9 +3,10 @@ Test script for AI trip planning functionality.
 Tests the finalize trip endpoint with AI plan generation.
 """
 
-import requests
 import json
 from datetime import datetime, timedelta
+
+import requests
 
 # Configuration
 BASE_URL = "http://localhost:8001"
@@ -121,7 +122,9 @@ def test_add_flight():
             "departure_airport": "JFK",
             "arrival_airport": "NRT",
             "departure_time": start_date.replace(hour=13, minute=0).isoformat(),
-            "arrival_time": (start_date + timedelta(hours=14)).replace(hour=17, minute=0).isoformat(),
+            "arrival_time": (start_date + timedelta(hours=14))
+            .replace(hour=17, minute=0)
+            .isoformat(),
             "price": 1200.00,
             "currency": "USD",
             "total_duration_min": 840,  # 14 hours
@@ -133,7 +136,9 @@ def test_add_flight():
         }
 
         headers = {"Authorization": f"Bearer {test_data['access_token']}"}
-        response = requests.post(f"{API_BASE}/flights/select", json=payload, headers=headers)
+        response = requests.post(
+            f"{API_BASE}/flights/select", json=payload, headers=headers
+        )
 
         assert response.status_code == 200
         print_success("Flight added to trip!")

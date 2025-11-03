@@ -116,6 +116,9 @@ class TripResponse(BaseModel):
     # Selected hotel information (will be Optional[SelectedHotelInfo])
     selected_hotel: Optional[dict] = None  # Using dict for now to avoid circular import
 
+    # Selected entertainment venues
+    selected_entertainments: Optional[List[dict]] = None  # Array of venue objects
+
     class Config:
         from_attributes = True
 

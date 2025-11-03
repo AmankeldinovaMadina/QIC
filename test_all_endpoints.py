@@ -633,7 +633,134 @@ def test_verify_hotel_saved():
 
 
 # ============================================================================
-# TEST 16: Finalize Trip
+# TEST 16: Search Entertainment Venues
+# ============================================================================
+def test_search_entertainment():
+    """Test searching for entertainment venues using Google Maps."""
+    print_test("Search Entertainment Venues")
+
+    try:
+        headers = {"Authorization": f"Bearer {test_data['access_token']}"}
+        search_payload = {
+            "trip_id": test_data["trip_id"],
+            "destination": "Tokyo",
+            # Let it use entertainment_tags from trip
+        }
+
+        response = requests.post(
+            f"{API_BASE}/entertainment/search", json=search_payload, headers=headers
+        )
+        print_response(response)
+
+        assert response.status_code == 200, "Entertainment search failed"
+        data = response.json()
+        assert "search_id" in data, "No search_id in response"
+        assert "venues" in data, "No venues in response"
+        assert len(data["venues"]) > 0, "No venues found"
+
+        # Store for next tests
+        test_data["entertainment_search_id"] = data["search_id"]
+        test_data["entertainment_venues"] = data["venues"]
+
+        print_success(f"Found {len(data['venues'])} entertainment venues!")
+        print_info(f"Query: {data['query']}")
+        print_info(f"Sample venues: {', '.join([v['title'] for v in data['venues'][:3]])}")
+
+        return True
+    except Exception as e:
+        print_error(f"Entertainment search failed: {e}")
+        return False
+
+
+# ============================================================================
+# TEST 17: Rank Entertainment Venues with AI
+# ============================================================================
+def test_rank_entertainment():
+    """Test ranking entertainment venues using AI."""
+    print_test("Rank Entertainment Venues with AI")
+
+    try:
+        headers = {"Authorization": f"Bearer {test_data['access_token']}"}
+        rank_payload = {
+            "trip_id": test_data["trip_id"],
+            "search_id": test_data["entertainment_search_id"],
+            "venues": test_data["entertainment_venues"],
+            "preferences_prompt": "Looking for authentic cultural experiences and great food",
+        }
+
+        response = requests.post(
+            f"{API_BASE}/entertainment/rank", json=rank_payload, headers=headers
+        )
+        print_response(response)
+
+        assert response.status_code == 200, "Entertainment ranking failed"
+        data = response.json()
+        assert "items" in data, "No items in response"
+        assert len(data["items"]) > 0, "No ranked items"
+        assert "ordered_place_ids" in data, "No ordered_place_ids"
+
+        # Store ranked items
+        test_data["entertainment_ranked_items"] = data["items"]
+
+        print_success(f"Ranked {len(data['items'])} venues!")
+        print_info(f"Model: {data['meta']['used_model']}")
+        
+        # Show top 3
+        for i, item in enumerate(data["items"][:3], 1):
+            venue = next((v for v in test_data["entertainment_venues"] if v["place_id"] == item["place_id"]), None)
+            if venue:
+                print_info(f"{i}. {venue['title']} (Score: {item['score']:.2f})")
+
+        return True
+    except Exception as e:
+        print_error(f"Entertainment ranking failed: {e}")
+        return False
+
+
+# ============================================================================
+# TEST 18: Select Multiple Entertainment Venues
+# ============================================================================
+def test_select_entertainment():
+    """Test selecting multiple entertainment venues."""
+    print_test("Select Multiple Entertainment Venues")
+
+    try:
+        headers = {"Authorization": f"Bearer {test_data['access_token']}"}
+
+        # Select top 5 venues
+        selections = []
+        for i, item in enumerate(test_data["entertainment_ranked_items"][:5]):
+            venue = next(
+                (v for v in test_data["entertainment_venues"] if v["place_id"] == item["place_id"]),
+                None,
+            )
+            if venue:
+                selections.append({"venue": venue, "ranking": item})
+
+        select_payload = {"trip_id": test_data["trip_id"], "selections": selections}
+
+        response = requests.post(
+            f"{API_BASE}/entertainment/select", json=select_payload, headers=headers
+        )
+        print_response(response)
+
+        assert response.status_code == 200, "Entertainment selection failed"
+        data = response.json()
+        assert data["success"] is True, "Selection not successful"
+        assert data["selected_count"] == 5, "Wrong number of selections"
+
+        print_success(f"Selected {data['selected_count']} entertainment venues!")
+        for sel in data["selections"]:
+            print_info(f"  • {sel['venue_name']} ({sel['venue_type']})")
+
+        return True
+    except Exception as e:
+        print_error(f"Entertainment selection failed: {e}")
+        return False
+
+
+# ============================================================================
+# TEST 19: Finalize Trip
 # ============================================================================
 def test_finalize_trip():
     """Test finalizing a trip."""
@@ -658,7 +785,7 @@ def test_finalize_trip():
 
 
 # ============================================================================
-# TEST 17: Get Trip Plan
+# TEST 20: Get Trip Plan
 # ============================================================================
 def test_get_trip_plan():
     """Test getting trip plan."""
@@ -683,7 +810,7 @@ def test_get_trip_plan():
 
 
 # ============================================================================
-# TEST 18: Get Trip Checklist
+# TEST 21: Get Trip Checklist
 # ============================================================================
 def test_get_trip_checklist():
     """Test getting trip checklist."""
@@ -757,6 +884,9 @@ def run_all_tests():
         ("Hotel AI Ranking", test_hotel_ranking),
         ("Select Hotel", test_select_hotel),
         ("Verify Hotel Saved", test_verify_hotel_saved),
+        ("Search Entertainment Venues", test_search_entertainment),
+        ("Rank Entertainment with AI", test_rank_entertainment),
+        ("Select Multiple Venues", test_select_entertainment),
         ("Finalize Trip", test_finalize_trip),
         ("Get Trip Plan", test_get_trip_plan),
         ("Get Trip Checklist", test_get_trip_checklist),
