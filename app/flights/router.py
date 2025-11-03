@@ -51,11 +51,17 @@ async def search_flights(
         num_adults = adults if adults is not None else trip.adults
         num_children = children if children is not None else trip.children
 
+        # Debug: Print what we got from trip
+        print(f"🏙️  Trip cities: from_city='{trip.from_city}', to_city='{trip.to_city}'")
+        print(f"🎫 Provided codes: dep='{dep_id}', arr='{arr_id}'")
+
         # If no IATA codes provided, try to map from city names
         if not dep_id:
             dep_id = _get_airport_code(trip.from_city)
+            print(f"   Mapped '{trip.from_city}' → '{dep_id}'")
         if not arr_id:
             arr_id = _get_airport_code(trip.to_city)
+            print(f"   Mapped '{trip.to_city}' → '{arr_id}'")
 
         print(
             f"🔍 Searching flights: {dep_id} → {arr_id}, "
@@ -63,18 +69,26 @@ async def search_flights(
         )
 
         # Search flights via SerpAPI
-        flights = await flight_search_service.search_flights(
-            departure_id=dep_id,
-            arrival_id=arr_id,
-            outbound_date=out_date,
-            return_date=ret_date,
-            adults=num_adults,
-            children=num_children,
-            currency=currency,
-            hl=hl,
-        )
-
-        print(f"✅ Found {len(flights)} flights")
+        try:
+            flights, google_flights_url = await flight_search_service.search_flights(
+                departure_id=dep_id,
+                arrival_id=arr_id,
+                outbound_date=out_date,
+                return_date=ret_date,
+                adults=num_adults,
+                children=num_children,
+                currency=currency,
+                hl=hl,
+            )
+            
+            # Add the Google Flights URL to all flights
+            for flight in flights:
+                flight.google_flights_url = google_flights_url
+                
+            print(f"✅ Found {len(flights)} flights")
+        except Exception as e:
+            print(f"⚠️  Flight search returned an error: {e}")
+            flights = []
 
         # Generate search ID
         import uuid
@@ -111,18 +125,11 @@ def _get_airport_code(city_name: str) -> str:
     """Map city name to primary airport IATA code."""
     # Simple mapping - in production, use a proper airport lookup service
     city_to_airport = {
+        # USA
         "new york": "JFK",
-        "tokyo": "NRT",
-        "london": "LHR",
-        "paris": "CDG",
         "los angeles": "LAX",
         "chicago": "ORD",
         "san francisco": "SFO",
-        "dubai": "DXB",
-        "singapore": "SIN",
-        "hong kong": "HKG",
-        "sydney": "SYD",
-        "toronto": "YYZ",
         "miami": "MIA",
         "boston": "BOS",
         "seattle": "SEA",
@@ -145,42 +152,308 @@ def _get_airport_code(city_name: str) -> str:
         "salt lake city": "SLC",
         "baltimore": "BWI",
         "san diego": "SAN",
+        
+        # UK
+        "london": "LHR",
+        "manchester": "MAN",
+        "edinburgh": "EDI",
+        "birmingham": "BHX",
+        "glasgow": "GLA",
+        
+        # France
+        "paris": "CDG",
+        "nice": "NCE",
+        "lyon": "LYS",
+        "marseille": "MRS",
+        "bordeaux": "BOD",
+        
+        # Germany
         "munich": "MUC",
         "frankfurt": "FRA",
-        "amsterdam": "AMS",
+        "berlin": "BER",
+        "hamburg": "HAM",
+        "cologne": "CGN",
+        
+        # Italy
         "rome": "FCO",
+        "milan": "MXP",
+        "venice": "VCE",
+        "florence": "FLR",
+        "naples": "NAP",
+        
+        # Spain
         "barcelona": "BCN",
         "madrid": "MAD",
+        "valencia": "VLC",
+        "seville": "SVQ",
+        "malaga": "AGP",
+        
+        # Netherlands
+        "amsterdam": "AMS",
+        "rotterdam": "RTM",
+        
+        # Switzerland
+        "zurich": "ZRH",
+        "geneva": "GVA",
+        
+        # Austria
+        "vienna": "VIE",
+        "salzburg": "SZG",
+        
+        # Portugal
+        "lisbon": "LIS",
+        "porto": "OPO",
+        
+        # Greece
+        "athens": "ATH",
+        "thessaloniki": "SKG",
+        "rhodes": "RHO",
+        
+        # Turkey
         "istanbul": "IST",
+        "ankara": "ESB",
+        "antalya": "AYT",
+        "izmir": "ADB",
+        
+        # Russia
         "moscow": "SVO",
+        "saint petersburg": "LED",
+        
+        # China
         "beijing": "PEK",
         "shanghai": "PVG",
+        "guangzhou": "CAN",
+        "shenzhen": "SZX",
+        "chengdu": "CTU",
+        "xian": "XIY",
+        "hangzhou": "HGH",
+        
+        # Japan
+        "tokyo": "NRT",
+        "osaka": "KIX",
+        "kyoto": "KIX",
+        "fukuoka": "FUK",
+        "sapporo": "CTS",
+        
+        # South Korea
         "seoul": "ICN",
+        "busan": "PUS",
+        
+        # Thailand
         "bangkok": "BKK",
+        "phuket": "HKT",
+        "chiang mai": "CNX",
+        
+        # Malaysia
         "kuala lumpur": "KUL",
+        "penang": "PEN",
+        
+        # Singapore
+        "singapore": "SIN",
+        
+        # Indonesia
+        "bali": "DPS",
+        "jakarta": "CGK",
+        "yogyakarta": "JOG",
+        
+        # Philippines
+        "manila": "MNL",
+        "cebu": "CEB",
+        
+        # Vietnam
+        "ho chi minh city": "SGN",
+        "hanoi": "HAN",
+        "da nang": "DAD",
+        
+        # India
         "delhi": "DEL",
         "mumbai": "BOM",
-        "melbourne": "MEL",
-        "auckland": "AKL",
-        "vancouver": "YVR",
-        "montreal": "YUL",
-        "mexico city": "MEX",
-        "sao paulo": "GRU",
-        "buenos aires": "EZE",
-        "santiago": "SCL",
-        "lima": "LIM",
-        "bogota": "BOG",
+        "bangalore": "BLR",
+        "chennai": "MAA",
+        "kolkata": "CCU",
+        "hyderabad": "HYD",
+        "pune": "PNQ",
+        "goa": "GOI",
+        
+        # UAE
+        "dubai": "DXB",
+        "abu dhabi": "AUH",
+        
+        # Saudi Arabia
+        "riyadh": "RUH",
+        "jeddah": "JED",
+        "makkah": "JED",
+        "medina": "MED",
+        
+        # Qatar
+        "doha": "DOH",
+        
+        # Kuwait
+        "kuwait city": "KWI",
+        
+        # Bahrain
+        "manama": "BAH",
+        
+        # Oman
+        "muscat": "MCT",
+        
+        # Egypt
         "cairo": "CAI",
+        "alexandria": "ALY",
+        "luxor": "LXR",
+        "sharm el sheikh": "SSH",
+        
+        # Morocco
+        "casablanca": "CMN",
+        "marrakech": "RAK",
+        "rabat": "RBA",
+        "fes": "FEZ",
+        
+        # South Africa
         "johannesburg": "JNB",
         "cape town": "CPT",
+        "durban": "DUR",
+        
+        # Australia
+        "sydney": "SYD",
+        "melbourne": "MEL",
+        "brisbane": "BNE",
+        "perth": "PER",
+        "adelaide": "ADL",
+        "gold coast": "OOL",
+        
+        # New Zealand
+        "auckland": "AKL",
+        "wellington": "WLG",
+        "christchurch": "CHC",
+        
+        # Canada
+        "toronto": "YYZ",
+        "vancouver": "YVR",
+        "montreal": "YUL",
+        "calgary": "YYC",
+        "ottawa": "YOW",
+        "edmonton": "YEG",
+        
+        # Mexico
+        "mexico city": "MEX",
+        "cancun": "CUN",
+        "guadalajara": "GDL",
+        "monterrey": "MTY",
+        "tijuana": "TIJ",
+        
+        # Brazil
+        "sao paulo": "GRU",
+        "rio de janeiro": "GIG",
+        "brasilia": "BSB",
+        "salvador": "SSA",
+        
+        # Argentina
+        "buenos aires": "EZE",
+        "cordoba": "COR",
+        
+        # Chile
+        "santiago": "SCL",
+        "valparaiso": "SCL",
+        
+        # Peru
+        "lima": "LIM",
+        "cuzco": "CUZ",
+        
+        # Colombia
+        "bogota": "BOG",
+        "medellin": "MDE",
+        "cartagena": "CTG",
+        
+        # Panama
+        "panama city": "PTY",
+        
+        # Costa Rica
+        "san jose": "SJO",
+        
+        # Cuba
+        "havana": "HAV",
+        
+        # Dominican Republic
+        "punta cana": "PUJ",
+        
+        # Jamaica
+        "kingston": "KIN",
+        
+        # Israel
         "tel aviv": "TLV",
-        "riyadh": "RUH",
-        "doha": "DOH",
-        "abu dhabi": "AUH",
+        "jerusalem": "TLV",
+        
+        # Jordan
+        "amman": "AMM",
+        
+        # Lebanon
+        "beirut": "BEY",
+        
+        # Hong Kong
+        "hong kong": "HKG",
+        
+        # Taiwan
+        "taipei": "TPE",
+        
+        # Iceland
+        "reykjavik": "KEF",
+        
+        # Denmark
+        "copenhagen": "CPH",
+        "aarhus": "AAR",
+        
+        # Sweden
+        "stockholm": "ARN",
+        "gothenburg": "GOT",
+        
+        # Norway
+        "oslo": "OSL",
+        "bergen": "BGO",
+        
+        # Finland
+        "helsinki": "HEL",
+        
+        # Belgium
+        "brussels": "BRU",
+        "antwerp": "ANR",
+        
+        # Ireland
+        "dublin": "DUB",
+        "cork": "ORK",
+        
+        # Poland
+        "warsaw": "WAW",
+        "krakow": "KRK",
+        
+        # Czech Republic
+        "prague": "PRG",
+        
+        # Hungary
+        "budapest": "BUD",
+        
+        # Croatia
+        "zagreb": "ZAG",
+        "dubrovnik": "DBV",
+        
+        # Serbia
+        "belgrade": "BEG",
+        
+        # Romania
+        "bucharest": "OTP",
+        
+        # Bulgaria
+        "sofia": "SOF",
+        
+        # Ukraine
+        "kyiv": "KBP",
+        "kiev": "KBP",
     }
 
-    normalized = city_name.lower().strip()
-    return city_to_airport.get(normalized, city_name.upper()[:3])
+    # Handle city names with countries like "Paris, France" or "Dubai, UAE"
+    # Split by comma and take the first part
+    city_only = city_name.split(',')[0].lower().strip()
+    return city_to_airport.get(city_only, city_name.upper()[:3])
 
 
 @router.post("/rank", response_model=RankResponse)

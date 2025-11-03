@@ -73,85 +73,114 @@ export function TripPlannerStepByStepPage({ onBack, tripData, onConfirm, onNotif
     }
   }, [currentStep, tripData?.id]);
 
-  // Generate mock flight data for MVP (since we don't have flight search API yet)
-  const generateMockFlights = async () => {
-    const fromCity = tripData?.from_city || tripData?.fromCity || 'Origin';
-    const toCity = tripData?.to_city || tripData?.toCity || 'Destination';
-    const startDate = tripData?.start_date || tripData?.startDate || new Date();
-
-    // Mock flights based on route
-    const mockFlights = [
-      {
-        id: 'flight_1',
-        airline: 'Premium Airlines',
-      price: '$450', 
-      time: '10:30 AM - 2:45 PM', 
-      duration: '4h 15m', 
-      stops: 'Direct', 
-      class: 'Economy',
-      pros: ['Direct flight', 'Great timing', 'Premium airline'],
-      cons: []
-    },
-    { 
-        id: 'flight_2',
-        airline: 'Value Airlines',
-      price: '$380', 
-      time: '6:00 AM - 10:15 AM', 
-      duration: '4h 15m', 
-      stops: '1 Stop', 
-      class: 'Economy',
-      pros: ['Best price', 'Morning arrival'],
-      cons: ['One stop', 'Early departure']
-      }
-    ];
-
-    // Try to rank with AI
-    try {
-      const preferencesPrompt = buildFlightPreferences();
-      const flightPayload = {
-        search_id: `search_${tripData.id}`,
-        preferences_prompt: preferencesPrompt,
-        flights: mockFlights.map(f => ({
-          id: f.id,
-          price: { amount: parseFloat(f.price.replace('$', '')), currency: 'USD' },
-          total_duration_min: 255,
-          stops: f.stops === 'Direct' ? 0 : 1,
-          legs: [{
-            dep_iata: 'ORIG',
-            dep_time: startDate.toISOString?.() || new Date().toISOString(),
-            arr_iata: 'DEST',
-            arr_time: new Date(Date.now() + 255 * 60000).toISOString(),
-            marketing: f.airline,
-            flight_no: 'XX123',
-            duration_min: 255
-          }]
-        }))
-      };
-      
-      const ranked: any = await flightsApi.rankFlights(flightPayload);
-      const formatted = ranked.items.map((item: any) => {
-        const original = mockFlights.find(f => f.id === item.id);
-        return {
-          ...original,
-          score: item.score,
-          aiPros: item.pros_keywords,
-          aiCons: item.cons_keywords
-        };
-      });
-      setFlightOptions(formatted);
-    } catch (error) {
-      console.error('Flight ranking failed, using mock data:', error);
-      setFlightOptions(mockFlights);
-    }
-  };
-
   const fetchFlightOptions = async () => {
     if (!tripData?.id || isLoadingFlights) return;
     setIsLoadingFlights(true);
     try {
-      await generateMockFlights();
+      // Search flights using SerpAPI
+      const searchResult: any = await flightsApi.searchFlights({
+        trip_id: tripData.id
+      });
+
+      const flights = searchResult.flights || [];
+      
+      // Transform to UI format
+      const formattedFlights = flights.map((flight: any) => {
+        const firstLeg = flight.legs?.[0];
+        const lastLeg = flight.legs?.[flight.legs.length - 1];
+        const allLegs = flight.legs || [];
+        
+        // Check if this is a round trip by seeing if the first leg arrives where last departs
+        const isRoundTrip = firstLeg && lastLeg && 
+          firstLeg.dep_iata === lastLeg.arr_iata && 
+          firstLeg.arr_iata === lastLeg.dep_iata;
+        
+        const depTime = firstLeg ? new Date(firstLeg.dep_time).toLocaleString('en-US', { 
+          hour: 'numeric', 
+          minute: '2-digit',
+          hour12: true 
+        }) : '';
+        const arrTime = lastLeg ? new Date(lastLeg.arr_time).toLocaleString('en-US', { 
+          hour: 'numeric', 
+          minute: '2-digit',
+          hour12: true 
+        }) : '';
+        
+        // For round trip, find the return leg
+        let returnDepTime = '';
+        let returnArrTime = '';
+        if (isRoundTrip && allLegs.length > 2) {
+          // Find the first leg that returns (dep from destination)
+          const returnLeg = allLegs.find((leg: any) => 
+            leg.dep_iata === firstLeg.arr_iata && leg.arr_iata === firstLeg.dep_iata
+          );
+          if (returnLeg) {
+            returnDepTime = new Date(returnLeg.dep_time).toLocaleString('en-US', { 
+              hour: 'numeric', 
+              minute: '2-digit',
+              hour12: true 
+            });
+            returnArrTime = new Date(returnLeg.arr_time).toLocaleString('en-US', { 
+              hour: 'numeric', 
+              minute: '2-digit',
+              hour12: true 
+            });
+          }
+        }
+        
+        const durationHrs = Math.floor(flight.total_duration_min / 60);
+        const durationMins = flight.total_duration_min % 60;
+        const durationStr = `${durationHrs}h ${durationMins}m`;
+        
+        const stopsStr = flight.stops === 0 
+          ? 'Direct' 
+          : `${flight.stops} Stop${flight.stops > 1 ? 's' : ''}`;
+        
+        return {
+          id: flight.id,
+          airline: firstLeg?.marketing || 'Unknown',
+          price: `$${flight.price?.amount || 0}`,
+          time: `${depTime} - ${arrTime}`,
+          duration: durationStr,
+          stops: stopsStr,
+          class: 'Economy', // Default class
+          rawFlight: flight, // Keep for ranking
+          google_flights_url: flight.google_flights_url,
+          isRoundTrip,
+          returnTime: returnDepTime && returnArrTime ? `${returnDepTime} - ${returnArrTime}` : null
+        };
+      });
+
+      // Rank flights with AI if we have flights
+      if (formattedFlights.length > 0) {
+        try {
+          const ranked: any = await flightsApi.rankFlights({
+            search_id: searchResult.search_id,
+            preferences_prompt: buildFlightPreferences(),
+            flights: flights
+          });
+          
+          const rankedFlights = ranked.items.map((item: any) => {
+            const original = formattedFlights.find((f: any) => f.id === item.id);
+            return {
+              ...original,
+              score: item.score,
+              aiPros: item.pros_keywords,
+              aiCons: item.cons_keywords
+            };
+          });
+          
+          setFlightOptions(rankedFlights);
+        } catch (error) {
+          console.error('Flight ranking failed, using unranked:', error);
+          setFlightOptions(formattedFlights);
+        }
+      } else {
+        setFlightOptions(formattedFlights);
+      }
     } catch (error) {
       console.error('Failed to fetch flights:', error);
+      setFlightOptions([]);
     } finally {
       setIsLoadingFlights(false);
     }
@@ -291,6 +320,11 @@ export function TripPlannerStepByStepPage({ onBack, tripData, onConfirm, onNotif
       
       const venues = searchResult.venues || [];
       
+      console.log('🎭 Found venues:', venues.length);
+      if (venues.length > 0) {
+        console.log('📋 Sample venue:', venues[0]);
+      }
+      
       // Rank venues with AI
       const ranked: any = await entertainmentApi.rankVenues({
         trip_id: tripData.id,
@@ -298,14 +332,22 @@ export function TripPlannerStepByStepPage({ onBack, tripData, onConfirm, onNotif
         venues: venues
       });
       
+      console.log('🏆 Ranked items:', ranked.items.length);
+      if (ranked.items.length > 0) {
+        console.log('📋 Sample ranked item:', ranked.items[0]);
+      }
+      
       const formatted = ranked.items.map((item: any) => {
         const original = venues.find((v: any) => v.place_id === item.place_id);
+        if (!original) {
+          console.log('⚠️  Could not find venue for place_id:', item.place_id);
+        }
         return {
           id: item.place_id,
           name: original?.title || 'Unknown',
           description: original?.description || '',
           duration: '2-4 hours',
-          price: original?.price || '$$',
+          price: original?.price || 'Price varies',
           rating: original?.rating || 0,
           reviews: original?.reviews || 0,
           thumbnail: original?.thumbnail,
@@ -316,6 +358,11 @@ export function TripPlannerStepByStepPage({ onBack, tripData, onConfirm, onNotif
           aiCons: item.cons_keywords
         };
       });
+      
+      console.log('✅ Formatted activities:', formatted.length);
+      if (formatted.length > 0) {
+        console.log('📋 Sample formatted:', formatted[0]);
+      }
       
       setActivityOptions(formatted.slice(0, 20)); // Limit to 20
     } catch (error) {
@@ -657,6 +704,9 @@ export function TripPlannerStepByStepPage({ onBack, tripData, onConfirm, onNotif
                 </div>
                 <div className="space-y-1 text-sm">
                   <p className="text-gray-600">{flight.time}</p>
+                  {flight.returnTime && (
+                    <p className="text-gray-600 text-xs">Return: {flight.returnTime}</p>
+                  )}
                   <div className="flex items-center gap-4 text-xs text-gray-500">
                     <span>{flight.duration}</span>
                     <span>•</span>
@@ -682,6 +732,19 @@ export function TripPlannerStepByStepPage({ onBack, tripData, onConfirm, onNotif
                   <span className="text-lg font-semibold text-blue-600">{flight.price}</span>
                   <span className="text-xs text-gray-500">per person</span>
                 </div>
+                {flight.google_flights_url && (
+                  <div className="mt-2">
+                    <a 
+                      href={flight.google_flights_url} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white text-center text-sm py-2 px-4 rounded-lg transition-colors inline-block"
+                    >
+                      Book on Google Flights →
+                    </a>
+                  </div>
+                )}
               </Card>
             ))
             )}

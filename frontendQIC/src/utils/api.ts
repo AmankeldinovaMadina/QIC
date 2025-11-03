@@ -191,6 +191,11 @@ export const tripsApi = {
 
 // Flights API
 export const flightsApi = {
+  searchFlights: async (query: any) => {
+    const params = new URLSearchParams(query).toString();
+    return apiRequest(`/flights/search?${params}`);
+  },
+
   rankFlights: async (rankingData: any) => {
     return apiRequest('/flights/rank', {
       method: 'POST',
