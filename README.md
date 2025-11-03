@@ -32,6 +32,14 @@ A FastAPI service that aggregates hidden places from OpenTripMap & OpenStreetMap
 - **Property Details**: Get detailed information for specific hotels
 - **Fallback System**: Heuristic ranking when OpenAI is unavailable
 
+### 🌍 Culture Guide
+- **AI-Generated Etiquette Tips**: Get 3-4 culture-specific tips for any destination
+- **Structured Outputs**: Type-safe, schema-validated responses using OpenAI
+- **Actionable Advice**: Each tip includes DO/AVOID guidance
+- **Multiple Categories**: Greetings, dress code, dining, taboos, tipping, and more
+- **Visual Indicators**: Emoji support for better UX
+- **Production-Ready**: Proper error handling and validation
+
 ## Setup
 
 1. **Install dependencies:**
