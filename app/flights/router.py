@@ -1,11 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user
 from app.db import User, get_async_session
 from app.flights.ai_ranker import OpenAIFlightRanker
 from app.flights.schemas import (
-    FlightSearchRequest,
     FlightSearchResponse,
     RankRequest,
     RankResponse,
@@ -17,53 +17,61 @@ from app.trips.service import trips_service
 router = APIRouter(prefix="/flights", tags=["flights"])
 
 
-@router.post("/search", response_model=FlightSearchResponse)
+@router.get("/search", response_model=FlightSearchResponse)
 async def search_flights(
-    req: FlightSearchRequest,
-    session=Depends(get_async_session),
+    trip_id: str = Query(..., description="Trip ID to search flights for"),
+    departure_id: Optional[str] = Query(None, description="IATA departure airport code (e.g., 'JFK')"),
+    arrival_id: Optional[str] = Query(None, description="IATA arrival airport code (e.g., 'NRT')"),
+    outbound_date: Optional[str] = Query(None, description="Departure date (YYYY-MM-DD)"),
+    return_date: Optional[str] = Query(None, description="Return date (YYYY-MM-DD)"),
+    adults: Optional[int] = Query(None, ge=1, le=20, description="Number of adults"),
+    children: Optional[int] = Query(None, ge=0, le=20, description="Number of children"),
+    currency: Optional[str] = Query("USD", description="Currency code (e.g., 'USD')"),
+    hl: Optional[str] = Query("en", description="Language code (e.g., 'en')"),
+    session: AsyncSession = Depends(get_async_session),
     current_user: User = Depends(get_current_user),
 ):
     """
     Search for flights using SerpAPI Google Flights.
-    
+
     If departure_id, arrival_id, or dates are not provided,
     they will be automatically pulled from the trip.
     """
     try:
         # Get trip details
-        trip = await trips_service.get_trip_by_id(session, req.trip_id, current_user.id)
+        trip = await trips_service.get_trip_by_id(session, trip_id, current_user.id)
         if not trip:
             raise HTTPException(status_code=404, detail="Trip not found")
 
         # Use trip data as defaults
-        departure_id = req.departure_id
-        arrival_id = req.arrival_id
-        outbound_date = req.outbound_date or trip.start_date.strftime("%Y-%m-%d")
-        return_date = req.return_date or trip.end_date.strftime("%Y-%m-%d")
-        adults = req.adults if req.adults is not None else trip.adults
-        children = req.children if req.children is not None else trip.children
+        dep_id = departure_id
+        arr_id = arrival_id
+        out_date = outbound_date or trip.start_date.strftime("%Y-%m-%d")
+        ret_date = return_date or trip.end_date.strftime("%Y-%m-%d")
+        num_adults = adults if adults is not None else trip.adults
+        num_children = children if children is not None else trip.children
 
         # If no IATA codes provided, try to map from city names
-        if not departure_id:
-            departure_id = _get_airport_code(trip.from_city)
-        if not arrival_id:
-            arrival_id = _get_airport_code(trip.to_city)
+        if not dep_id:
+            dep_id = _get_airport_code(trip.from_city)
+        if not arr_id:
+            arr_id = _get_airport_code(trip.to_city)
 
         print(
-            f"🔍 Searching flights: {departure_id} → {arrival_id}, "
-            f"{outbound_date} to {return_date}, {adults} adults, {children} children"
+            f"🔍 Searching flights: {dep_id} → {arr_id}, "
+            f"{out_date} to {ret_date}, {num_adults} adults, {num_children} children"
         )
 
         # Search flights via SerpAPI
         flights = await flight_search_service.search_flights(
-            departure_id=departure_id,
-            arrival_id=arrival_id,
-            outbound_date=outbound_date,
-            return_date=return_date,
-            adults=adults,
-            children=children,
-            currency=req.currency or "USD",
-            hl=req.hl or "en",
+            departure_id=dep_id,
+            arrival_id=arr_id,
+            outbound_date=out_date,
+            return_date=ret_date,
+            adults=num_adults,
+            children=num_children,
+            currency=currency,
+            hl=hl,
         )
 
         print(f"✅ Found {len(flights)} flights")
@@ -74,17 +82,17 @@ async def search_flights(
         search_id = str(uuid.uuid4())
 
         return FlightSearchResponse(
-            trip_id=req.trip_id,
+            trip_id=trip_id,
             search_id=search_id,
             flights=flights,
             search_params={
-                "departure_id": departure_id,
-                "arrival_id": arrival_id,
-                "outbound_date": outbound_date,
-                "return_date": return_date,
-                "adults": adults,
-                "children": children,
-                "currency": req.currency or "USD",
+                "departure_id": dep_id,
+                "arrival_id": arr_id,
+                "outbound_date": out_date,
+                "return_date": ret_date,
+                "adults": num_adults,
+                "children": num_children,
+                "currency": currency,
             },
             total_results=len(flights),
         )

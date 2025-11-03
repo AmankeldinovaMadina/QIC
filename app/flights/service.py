@@ -1,12 +1,13 @@
 """Flight search service using SerpAPI."""
 
-import httpx
 import uuid
 from datetime import datetime
 from typing import List, Optional
 
+import httpx
+
 from app.core.settings import settings
-from app.flights.schemas import Itinerary, FlightLeg, Price
+from app.flights.schemas import FlightLeg, Itinerary, Price
 
 
 class FlightSearchService:

@@ -1,7 +1,8 @@
 """Comprehensive test for all flight endpoints."""
 
-import requests
 import json
+
+import requests
 
 BASE_URL = "http://localhost:8001/api/v1"
 
@@ -56,16 +57,15 @@ def test_all_flight_endpoints():
     print(f"      Dates: {trip['start_date']} to {trip['end_date']}")
     print(f"      Passengers: {trip['adults']} adults, {trip['children']} children")
 
-    # Step 3: Search flights using backend API
+    # Step 3: Search flights using backend API (GET request)
     print("\n3️⃣  SEARCH FLIGHTS (Backend API → SerpAPI)")
     print("-" * 70)
-    search_request = {
-        "trip_id": trip_id,
-        # Let backend auto-fill from trip data
-    }
-
-    response = requests.post(
-        f"{BASE_URL}/flights/search", json=search_request, headers=headers
+    
+    # Using GET with query parameters
+    response = requests.get(
+        f"{BASE_URL}/flights/search",
+        params={"trip_id": trip_id},  # Let backend auto-fill from trip data
+        headers=headers
     )
     assert response.status_code == 200, f"Flight search failed: {response.text}"
     search_result = response.json()
@@ -73,7 +73,9 @@ def test_all_flight_endpoints():
     print(f"   ✅ Flight search successful!")
     print(f"      Search ID: {search_result['search_id']}")
     print(f"      Total results: {search_result['total_results']}")
-    print(f"      Search params: {json.dumps(search_result['search_params'], indent=6)}")
+    print(
+        f"      Search params: {json.dumps(search_result['search_params'], indent=6)}"
+    )
 
     flights = search_result["flights"]
     assert len(flights) > 0, "No flights found"
@@ -82,7 +84,9 @@ def test_all_flight_endpoints():
     for i, flight in enumerate(flights[:5], 1):  # Show first 5
         print(f"\n      Flight {i}:")
         print(f"         ID: {flight['id']}")
-        print(f"         Price: ${flight['price']['amount']} {flight['price']['currency']}")
+        print(
+            f"         Price: ${flight['price']['amount']} {flight['price']['currency']}"
+        )
         print(f"         Duration: {flight['total_duration_min']} minutes")
         print(f"         Stops: {flight['stops']}")
         if flight.get("emissions_kg"):
@@ -119,7 +123,9 @@ def test_all_flight_endpoints():
 
     print(f"\n   🏆 Top 5 Ranked Flights:")
     for i, flight_id in enumerate(rank_result["ordered_ids"][:5], 1):
-        rank_item = next((item for item in rank_result["items"] if item["id"] == flight_id), None)
+        rank_item = next(
+            (item for item in rank_result["items"] if item["id"] == flight_id), None
+        )
         original_flight = next((f for f in flights if f["id"] == flight_id), None)
 
         if rank_item and original_flight:
@@ -137,10 +143,12 @@ def test_all_flight_endpoints():
     # Step 5: Select the best flight
     print("\n5️⃣  SELECT FLIGHT")
     print("-" * 70)
-    
+
     # Get the top-ranked flight
     best_flight_id = rank_result["ordered_ids"][0]
-    best_rank_item = next(item for item in rank_result["items"] if item["id"] == best_flight_id)
+    best_rank_item = next(
+        item for item in rank_result["items"] if item["id"] == best_flight_id
+    )
     best_flight = next(f for f in flights if f["id"] == best_flight_id)
 
     # Prepare selection request
@@ -185,10 +193,8 @@ def test_all_flight_endpoints():
     # Step 6: Retrieve selected flight (dedicated endpoint)
     print("\n6️⃣  GET SELECTED FLIGHT (Dedicated Endpoint)")
     print("-" * 70)
-    
-    response = requests.get(
-        f"{BASE_URL}/flights/{trip_id}/selection", headers=headers
-    )
+
+    response = requests.get(f"{BASE_URL}/flights/{trip_id}/selection", headers=headers)
     assert response.status_code == 200, f"GET flight selection failed: {response.text}"
     flight_selection = response.json()
 
@@ -196,7 +202,9 @@ def test_all_flight_endpoints():
     selected = flight_selection["selected_flight"]
     print(f"      Flight ID: {selected['flight_id']}")
     print(f"      Airline: {selected['airline']} {selected['flight_number']}")
-    print(f"      Route: {selected['departure_airport']} → {selected['arrival_airport']}")
+    print(
+        f"      Route: {selected['departure_airport']} → {selected['arrival_airport']}"
+    )
     print(f"      Departure: {selected['departure_time']}")
     print(f"      Arrival: {selected['arrival_time']}")
     print(f"      Price: ${selected['price']} {selected['currency']}")
@@ -210,7 +218,7 @@ def test_all_flight_endpoints():
     # Step 7: Verify in trip details
     print("\n7️⃣  VERIFY IN TRIP DETAILS")
     print("-" * 70)
-    
+
     response = requests.get(f"{BASE_URL}/trips/{trip_id}", headers=headers)
     assert response.status_code == 200, f"GET trip failed: {response.text}"
     trip_details = response.json()
@@ -222,7 +230,9 @@ def test_all_flight_endpoints():
     print(f"      Trip Status: {trip_details['status']}")
     print(f"      Selected Flight:")
     print(f"         {trip_flight['airline']} {trip_flight['flight_number']}")
-    print(f"         {trip_flight['departure_airport']} → {trip_flight['arrival_airport']}")
+    print(
+        f"         {trip_flight['departure_airport']} → {trip_flight['arrival_airport']}"
+    )
     print(f"         ${trip_flight['price']} {trip_flight['currency']}")
     print(f"         AI Score: {trip_flight['score']}")
 
@@ -255,5 +265,6 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n💥 ERROR: {e}")
         import traceback
+
         traceback.print_exc()
         exit(1)

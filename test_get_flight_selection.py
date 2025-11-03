@@ -51,9 +51,7 @@ def test_get_flight_selection():
 
     # Step 3: Check flight selection (should be empty)
     print("\n3️⃣  Checking flight selection (should be empty)...")
-    response = requests.get(
-        f"{BASE_URL}/flights/{trip_id}/selection", headers=headers
-    )
+    response = requests.get(f"{BASE_URL}/flights/{trip_id}/selection", headers=headers)
     assert response.status_code == 200, f"GET failed: {response.text}"
     data = response.json()
     assert data["trip_id"] == trip_id
@@ -89,15 +87,13 @@ def test_get_flight_selection():
 
     # Step 5: Get flight selection (should have data)
     print("\n5️⃣  Retrieving flight selection...")
-    response = requests.get(
-        f"{BASE_URL}/flights/{trip_id}/selection", headers=headers
-    )
+    response = requests.get(f"{BASE_URL}/flights/{trip_id}/selection", headers=headers)
     assert response.status_code == 200, f"GET failed: {response.text}"
     data = response.json()
     assert data["trip_id"] == trip_id
     assert data["selected_flight"] is not None
     flight = data["selected_flight"]
-    
+
     print(f"\n   ✅ Flight retrieved successfully!")
     print(f"      Flight ID: {flight['flight_id']}")
     print(f"      Airline: {flight['airline']} {flight['flight_number']}")

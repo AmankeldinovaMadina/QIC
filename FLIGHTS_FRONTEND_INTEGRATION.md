@@ -60,35 +60,34 @@ Frontend → Backend /flights/search → SerpAPI Google Flights
 ---
 
 ### Step 2: Search for Flights (Backend API)
-**Endpoint:** `POST /api/v1/flights/search`
+**Endpoint:** `GET /api/v1/flights/search`
 
 **Purpose:** Search for flights using the backend (which calls SerpAPI Google Flights)
 
-**Request:**
-```json
-{
-  "trip_id": "550e8400-e29b-41d4-a716-446655440000",
-  "departure_id": "JFK",
-  "arrival_id": "NRT",
-  "outbound_date": "2025-06-01",
-  "return_date": "2025-06-10",
-  "adults": 2,
-  "children": 0,
-  "currency": "USD",
-  "hl": "en"
-}
-```
+**Query Parameters:**
+- `trip_id` (required): The trip ID to search flights for
+- `departure_id` (optional): IATA airport code (e.g., "JFK")
+- `arrival_id` (optional): IATA airport code (e.g., "NRT")
+- `outbound_date` (optional): Departure date in YYYY-MM-DD format
+- `return_date` (optional): Return date in YYYY-MM-DD format
+- `adults` (optional): Number of adults (1-20)
+- `children` (optional): Number of children (0-20)
+- `currency` (optional): Currency code (default: "USD")
+- `hl` (optional): Language code (default: "en")
 
-**Note:** All fields except `trip_id` are optional. If not provided, the backend will:
+**Note:** All parameters except `trip_id` are optional. If not provided, the backend will:
 - Use the trip's `start_date` and `end_date`
 - Use the trip's `adults` and `children` count
 - Auto-map city names to airport codes (e.g., "New York" → "JFK", "Tokyo" → "NRT")
 
 **Minimal Request (using trip data):**
-```json
-{
-  "trip_id": "550e8400-e29b-41d4-a716-446655440000"
-}
+```
+GET /api/v1/flights/search?trip_id=550e8400-e29b-41d4-a716-446655440000
+```
+
+**Full Request with custom parameters:**
+```
+GET /api/v1/flights/search?trip_id=550e8400-e29b-41d4-a716-446655440000&departure_id=JFK&arrival_id=NRT&outbound_date=2025-06-01&return_date=2025-06-10&adults=2&children=0&currency=USD&hl=en
 ```
 
 **Response:**
@@ -167,17 +166,15 @@ Frontend → Backend /flights/search → SerpAPI Google Flights
 **Frontend Example:**
 ```javascript
 const searchFlights = async (tripId) => {
-  const response = await fetch(`http://localhost:8001/api/v1/flights/search`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${accessToken}`
-    },
-    body: JSON.stringify({
-      trip_id: tripId
-      // Backend will auto-fill from trip data!
-    })
-  });
+  const response = await fetch(
+    `http://localhost:8001/api/v1/flights/search?trip_id=${tripId}`, 
+    {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`
+      }
+    }
+  );
   
   const data = await response.json();
   return data;
@@ -185,19 +182,20 @@ const searchFlights = async (tripId) => {
 
 // Or with custom parameters
 const searchFlightsCustom = async (tripId, customParams) => {
-  const response = await fetch(`http://localhost:8001/api/v1/flights/search`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${accessToken}`
-    },
-    body: JSON.stringify({
-      trip_id: tripId,
-      departure_id: customParams.departureAirport, // e.g., "LAX" instead of "JFK"
-      arrival_id: customParams.arrivalAirport,
-      ...customParams
-    })
+  const params = new URLSearchParams({
+    trip_id: tripId,
+    ...customParams  // e.g., { departure_id: "LAX", arrival_id: "SFO" }
   });
+  
+  const response = await fetch(
+    `http://localhost:8001/api/v1/flights/search?${params}`, 
+    {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`
+      }
+    }
+  );
   
   return await response.json();
 };
@@ -605,10 +603,8 @@ const tripStore = {
     // Step 2: Search flights (backend API)
     async searchFlights() {
       this.flightSearch.loading = true;
-      const response = await api.post('/api/v1/flights/search', {
-        trip_id: this.currentTrip.id
-        // Backend auto-fills from trip data!
-      });
+      const params = new URLSearchParams({ trip_id: this.currentTrip.id });
+      const response = await api.get(`/api/v1/flights/search?${params}`);
       this.flightSearch.results = response.data.flights;
       this.flightSearch.loading = false;
       return response.data;
@@ -810,17 +806,16 @@ const FlightSelection = () => {
   const searchFlights = async () => {
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:8001/api/v1/flights/search', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${getToken()}`
-        },
-        body: JSON.stringify({
-          trip_id: tripId
-          // Backend will auto-fill from trip data!
-        })
-      });
+      const params = new URLSearchParams({ trip_id: tripId });
+      const response = await fetch(
+        `http://localhost:8001/api/v1/flights/search?${params}`, 
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${getToken()}`
+          }
+        }
+      );
       
       const data = await response.json();
       setFlights(data.flights);
@@ -1023,18 +1018,19 @@ export default FlightSelection;
 ## Summary
 
 ### Key Points:
-1. **Flight Search**: Done on frontend using SerpAPI/Google Flights
+1. **Flight Search**: Backend GET endpoint `/api/v1/flights/search` calls SerpAPI
 2. **AI Ranking**: Backend endpoint `/flights/rank` analyzes flights
 3. **Selection**: Backend endpoint `/flights/select` saves to trip
 4. **Retrieval**: Use `/trips/{trip_id}` to get trip with selected flight
 5. **Single Selection**: User can only select ONE flight per trip (unlike entertainments)
 
 ### Endpoint Summary:
-- ✅ `POST /trips` - Create trip
-- ✅ `POST /flights/rank` - AI rank flights (no auth required)
-- ✅ `POST /flights/select` - Save selected flight (auth required)
-- ✅ `GET /trips/{trip_id}` - Get trip with selected flight (auth required)
-- ⭐ **NEW:** `GET /flights/{trip_id}/selection` - Get only flight selection
+- ✅ `POST /api/v1/trips` - Create trip
+- ✅ `GET /api/v1/flights/search` - Search flights (⭐ GET request - RESTful!)
+- ✅ `POST /api/v1/flights/rank` - AI rank flights (no auth required)
+- ✅ `POST /api/v1/flights/select` - Save selected flight (auth required)
+- ✅ `GET /api/v1/trips/{trip_id}` - Get trip with selected flight (auth required)
+- ⭐ **NEW:** `GET /api/v1/flights/{trip_id}/selection` - Get only flight selection
 
 ### Next Steps:
 Would you like me to:
