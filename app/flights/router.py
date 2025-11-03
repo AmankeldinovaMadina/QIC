@@ -4,11 +4,175 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import get_current_user
 from app.db import User, get_async_session
 from app.flights.ai_ranker import OpenAIFlightRanker
-from app.flights.schemas import RankRequest, RankResponse
+from app.flights.schemas import (
+    FlightSearchRequest,
+    FlightSearchResponse,
+    RankRequest,
+    RankResponse,
+)
+from app.flights.service import flight_search_service
 from app.trips.schemas import FlightSelectionRequest, FlightSelectionResponse
 from app.trips.service import trips_service
 
 router = APIRouter(prefix="/flights", tags=["flights"])
+
+
+@router.post("/search", response_model=FlightSearchResponse)
+async def search_flights(
+    req: FlightSearchRequest,
+    session=Depends(get_async_session),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Search for flights using SerpAPI Google Flights.
+    
+    If departure_id, arrival_id, or dates are not provided,
+    they will be automatically pulled from the trip.
+    """
+    try:
+        # Get trip details
+        trip = await trips_service.get_trip_by_id(session, req.trip_id, current_user.id)
+        if not trip:
+            raise HTTPException(status_code=404, detail="Trip not found")
+
+        # Use trip data as defaults
+        departure_id = req.departure_id
+        arrival_id = req.arrival_id
+        outbound_date = req.outbound_date or trip.start_date.strftime("%Y-%m-%d")
+        return_date = req.return_date or trip.end_date.strftime("%Y-%m-%d")
+        adults = req.adults if req.adults is not None else trip.adults
+        children = req.children if req.children is not None else trip.children
+
+        # If no IATA codes provided, try to map from city names
+        if not departure_id:
+            departure_id = _get_airport_code(trip.from_city)
+        if not arrival_id:
+            arrival_id = _get_airport_code(trip.to_city)
+
+        print(
+            f"🔍 Searching flights: {departure_id} → {arrival_id}, "
+            f"{outbound_date} to {return_date}, {adults} adults, {children} children"
+        )
+
+        # Search flights via SerpAPI
+        flights = await flight_search_service.search_flights(
+            departure_id=departure_id,
+            arrival_id=arrival_id,
+            outbound_date=outbound_date,
+            return_date=return_date,
+            adults=adults,
+            children=children,
+            currency=req.currency or "USD",
+            hl=req.hl or "en",
+        )
+
+        print(f"✅ Found {len(flights)} flights")
+
+        # Generate search ID
+        import uuid
+
+        search_id = str(uuid.uuid4())
+
+        return FlightSearchResponse(
+            trip_id=req.trip_id,
+            search_id=search_id,
+            flights=flights,
+            search_params={
+                "departure_id": departure_id,
+                "arrival_id": arrival_id,
+                "outbound_date": outbound_date,
+                "return_date": return_date,
+                "adults": adults,
+                "children": children,
+                "currency": req.currency or "USD",
+            },
+            total_results=len(flights),
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"💥 ERROR in search_flights: {e}")
+        import traceback
+
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def _get_airport_code(city_name: str) -> str:
+    """Map city name to primary airport IATA code."""
+    # Simple mapping - in production, use a proper airport lookup service
+    city_to_airport = {
+        "new york": "JFK",
+        "tokyo": "NRT",
+        "london": "LHR",
+        "paris": "CDG",
+        "los angeles": "LAX",
+        "chicago": "ORD",
+        "san francisco": "SFO",
+        "dubai": "DXB",
+        "singapore": "SIN",
+        "hong kong": "HKG",
+        "sydney": "SYD",
+        "toronto": "YYZ",
+        "miami": "MIA",
+        "boston": "BOS",
+        "seattle": "SEA",
+        "las vegas": "LAS",
+        "orlando": "MCO",
+        "atlanta": "ATL",
+        "washington": "IAD",
+        "denver": "DEN",
+        "phoenix": "PHX",
+        "dallas": "DFW",
+        "houston": "IAH",
+        "philadelphia": "PHL",
+        "detroit": "DTW",
+        "minneapolis": "MSP",
+        "tampa": "TPA",
+        "charlotte": "CLT",
+        "portland": "PDX",
+        "austin": "AUS",
+        "nashville": "BNA",
+        "salt lake city": "SLC",
+        "baltimore": "BWI",
+        "san diego": "SAN",
+        "munich": "MUC",
+        "frankfurt": "FRA",
+        "amsterdam": "AMS",
+        "rome": "FCO",
+        "barcelona": "BCN",
+        "madrid": "MAD",
+        "istanbul": "IST",
+        "moscow": "SVO",
+        "beijing": "PEK",
+        "shanghai": "PVG",
+        "seoul": "ICN",
+        "bangkok": "BKK",
+        "kuala lumpur": "KUL",
+        "delhi": "DEL",
+        "mumbai": "BOM",
+        "melbourne": "MEL",
+        "auckland": "AKL",
+        "vancouver": "YVR",
+        "montreal": "YUL",
+        "mexico city": "MEX",
+        "sao paulo": "GRU",
+        "buenos aires": "EZE",
+        "santiago": "SCL",
+        "lima": "LIM",
+        "bogota": "BOG",
+        "cairo": "CAI",
+        "johannesburg": "JNB",
+        "cape town": "CPT",
+        "tel aviv": "TLV",
+        "riyadh": "RUH",
+        "doha": "DOH",
+        "abu dhabi": "AUH",
+    }
+
+    normalized = city_name.lower().strip()
+    return city_to_airport.get(normalized, city_name.upper()[:3])
 
 
 @router.post("/rank", response_model=RankResponse)
@@ -85,6 +249,44 @@ async def select_flight_for_trip(
                     req.departure_time.isoformat() if req.departure_time else None
                 ),
             },
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"💥 ERROR: {e}")
+        import traceback
+
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{trip_id}/selection")
+async def get_flight_selection(
+    trip_id: str,
+    session=Depends(get_async_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Get the selected flight for a trip."""
+    try:
+        # Get the trip and verify ownership
+        trip = await trips_service.get_trip_by_id(session, trip_id, current_user.id)
+        if not trip:
+            raise HTTPException(status_code=404, detail="Trip not found")
+
+        # Build flight info
+        selected_flight = trips_service._build_selected_flight_info(trip)
+
+        if not selected_flight:
+            return {
+                "trip_id": trip_id,
+                "selected_flight": None,
+                "message": "No flight selected for this trip yet",
+            }
+
+        return {
+            "trip_id": trip_id,
+            "selected_flight": selected_flight,
         }
 
     except HTTPException:

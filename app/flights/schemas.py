@@ -45,6 +45,30 @@ class Locale(BaseModel):
     tz: Optional[str] = None
 
 
+class FlightSearchRequest(BaseModel):
+    """Request for flight search."""
+
+    trip_id: str
+    departure_id: Optional[str] = None  # IATA code (e.g., "JFK")
+    arrival_id: Optional[str] = None  # IATA code (e.g., "NRT")
+    outbound_date: Optional[str] = None  # YYYY-MM-DD
+    return_date: Optional[str] = None  # YYYY-MM-DD
+    adults: Optional[int] = 1
+    children: Optional[int] = 0
+    currency: Optional[str] = "USD"
+    hl: Optional[str] = "en"
+
+
+class FlightSearchResponse(BaseModel):
+    """Response containing flight search results."""
+
+    trip_id: str
+    search_id: str
+    flights: List[Itinerary]
+    search_params: dict
+    total_results: int
+
+
 class RankRequest(BaseModel):
     """Request for flight ranking."""
 
