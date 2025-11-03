@@ -1,15 +1,12 @@
 from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user
 from app.db import User, get_async_session
 from app.flights.ai_ranker import OpenAIFlightRanker
-from app.flights.schemas import (
-    FlightSearchResponse,
-    RankRequest,
-    RankResponse,
-)
+from app.flights.schemas import FlightSearchResponse, RankRequest, RankResponse
 from app.flights.service import flight_search_service
 from app.trips.schemas import FlightSelectionRequest, FlightSelectionResponse
 from app.trips.service import trips_service
@@ -20,12 +17,20 @@ router = APIRouter(prefix="/flights", tags=["flights"])
 @router.get("/search", response_model=FlightSearchResponse)
 async def search_flights(
     trip_id: str = Query(..., description="Trip ID to search flights for"),
-    departure_id: Optional[str] = Query(None, description="IATA departure airport code (e.g., 'JFK')"),
-    arrival_id: Optional[str] = Query(None, description="IATA arrival airport code (e.g., 'NRT')"),
-    outbound_date: Optional[str] = Query(None, description="Departure date (YYYY-MM-DD)"),
+    departure_id: Optional[str] = Query(
+        None, description="IATA departure airport code (e.g., 'JFK')"
+    ),
+    arrival_id: Optional[str] = Query(
+        None, description="IATA arrival airport code (e.g., 'NRT')"
+    ),
+    outbound_date: Optional[str] = Query(
+        None, description="Departure date (YYYY-MM-DD)"
+    ),
     return_date: Optional[str] = Query(None, description="Return date (YYYY-MM-DD)"),
     adults: Optional[int] = Query(None, ge=1, le=20, description="Number of adults"),
-    children: Optional[int] = Query(None, ge=0, le=20, description="Number of children"),
+    children: Optional[int] = Query(
+        None, ge=0, le=20, description="Number of children"
+    ),
     currency: Optional[str] = Query("USD", description="Currency code (e.g., 'USD')"),
     hl: Optional[str] = Query("en", description="Language code (e.g., 'en')"),
     session: AsyncSession = Depends(get_async_session),
