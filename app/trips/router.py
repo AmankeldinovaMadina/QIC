@@ -2,21 +2,22 @@
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db import get_async_session, User
 from app.auth import get_current_user
+from app.db import User, get_async_session
+from app.db.models import TripStatus
 from app.trips.schemas import (
+    TripChecklistResponse,
     TripCreateRequest,
-    TripUpdateRequest, 
-    TripResponse,
     TripListResponse,
     TripPlanResponse,
-    TripChecklistResponse
+    TripResponse,
+    TripUpdateRequest,
 )
 from app.trips.service import trips_service
-from app.db.models import TripStatus
+from app.ai.planner import generate_trip_plan
 
 router = APIRouter(prefix="/trips", tags=["trips"])
 
@@ -25,7 +26,7 @@ router = APIRouter(prefix="/trips", tags=["trips"])
 async def create_trip(
     trip_data: TripCreateRequest,
     session: AsyncSession = Depends(get_async_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """Create a new trip."""
     trip = await trips_service.create_trip(session, current_user.id, trip_data)
@@ -38,42 +39,36 @@ async def get_trips(
     page: int = Query(1, ge=1, description="Page number"),
     per_page: int = Query(20, ge=1, le=100, description="Items per page"),
     session: AsyncSession = Depends(get_async_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """Get user's trips with pagination."""
     trips, total = await trips_service.get_user_trips(
         session, current_user.id, status, page, per_page
     )
-    
-    return TripListResponse(
-        trips=trips,
-        total=total,
-        page=page,
-        per_page=per_page
-    )
+
+    return TripListResponse(trips=trips, total=total, page=page, per_page=per_page)
 
 
 @router.get("/{trip_id}", response_model=TripResponse)
 async def get_trip(
     trip_id: str,
     session: AsyncSession = Depends(get_async_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """Get a specific trip."""
     trip = await trips_service.get_trip_by_id(session, trip_id, current_user.id)
-    
+
     if not trip:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Trip not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Trip not found"
         )
-    
+
     # Build the selected flight info if it exists
     selected_flight = trips_service._build_selected_flight_info(trip)
-    
+
     # Build the selected hotel info if it exists (returns dict directly)
     selected_hotel = trips_service._build_selected_hotel_info(trip)
-    
+
     # Create response with selected flight and hotel
     return TripResponse(
         id=trip.id,
@@ -95,7 +90,7 @@ async def get_trip(
         created_at=trip.created_at,
         updated_at=trip.updated_at,
         selected_flight=selected_flight,
-        selected_hotel=selected_hotel
+        selected_hotel=selected_hotel,
     )
 
 
@@ -104,17 +99,18 @@ async def update_trip(
     trip_id: str,
     update_data: TripUpdateRequest,
     session: AsyncSession = Depends(get_async_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """Update a trip."""
-    trip = await trips_service.update_trip(session, trip_id, current_user.id, update_data)
-    
+    trip = await trips_service.update_trip(
+        session, trip_id, current_user.id, update_data
+    )
+
     if not trip:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Trip not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Trip not found"
         )
-    
+
     return trip
 
 
@@ -122,17 +118,16 @@ async def update_trip(
 async def delete_trip(
     trip_id: str,
     session: AsyncSession = Depends(get_async_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """Delete a trip."""
     success = await trips_service.delete_trip(session, trip_id, current_user.id)
-    
+
     if not success:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Trip not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Trip not found"
         )
-    
+
     return {"message": "Trip deleted successfully"}
 
 
@@ -140,51 +135,108 @@ async def delete_trip(
 async def finalize_trip(
     trip_id: str,
     session: AsyncSession = Depends(get_async_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
-    """Finalize a trip (will be enhanced with AI-generated plan/checklist)."""
-    # For now, use placeholder data - will be replaced with AI generation
-    plan_json = {
-        "status": "finalized",
-        "message": "Trip finalized successfully",
-        "days": []
-    }
+    """
+    Finalize a trip and generate AI-powered daily plan.
     
-    checklist_json = {
-        "pre_trip": [],
-        "packing": [],
-        "documents": [],
-        "during_trip": []
-    }
-    
-    trip = await trips_service.finalize_trip(
-        session, trip_id, current_user.id, plan_json, checklist_json
-    )
+    This endpoint:
+    1. Validates the trip belongs to the user
+    2. Generates a detailed daily itinerary using OpenAI Structured Outputs
+    3. Considers selected flight, hotel, and user preferences
+    4. Stores the generated plan in the database
+    5. Updates trip status to 'planned'
+    """
+    # First, get the trip to pass to AI planner
+    trip = await trips_service.get_trip_by_id(session, trip_id, current_user.id)
     
     if not trip:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Trip not found or cannot be finalized"
+            detail="Trip not found",
         )
     
-    return trip
+    if trip.status == TripStatus.PLANNED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Trip is already finalized",
+        )
+    
+    try:
+        # Generate AI-powered trip plan using OpenAI Structured Outputs
+        print(f"Generating AI plan for trip {trip_id}...")
+        plan_json = generate_trip_plan(trip)
+        print(f"Plan generated successfully. Keys: {list(plan_json.keys())}")
+        
+        # Generate a simple checklist (can be enhanced with AI later)
+        checklist_json = {
+            "pre_trip": [
+                "Check passport validity (6 months minimum)",
+                "Apply for visa if required",
+                "Book transportation and accommodation",
+                "Arrange travel insurance",
+                "Notify bank of travel dates",
+            ],
+            "packing": [
+                "Travel documents (passport, visa, tickets)",
+                "Clothing appropriate for destination weather",
+                "Toiletries and medications",
+                "Electronics and chargers",
+                "Emergency contact information",
+            ],
+            "documents": [
+                "Passport",
+                "Visa",
+                "Flight tickets",
+                "Hotel confirmations",
+                "Travel insurance documents",
+            ],
+            "during_trip": [
+                "Keep important documents secure",
+                "Stay aware of local customs",
+                "Keep emergency contacts handy",
+                "Monitor weather and local news",
+            ],
+        }
+        
+        # Save plan and finalize trip
+        finalized_trip = await trips_service.finalize_trip(
+            session, trip_id, current_user.id, plan_json, checklist_json
+        )
+        
+        if not finalized_trip:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Trip not found or cannot be finalized",
+            )
+        
+        return finalized_trip
+        
+    except Exception as e:
+        # Log the error and return a helpful message
+        import traceback
+        print(f"Error generating trip plan: {str(e)}")
+        print(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Failed to generate trip plan: {str(e)}",
+        )
 
 
 @router.get("/{trip_id}/plan", response_model=TripPlanResponse)
 async def get_trip_plan(
     trip_id: str,
     session: AsyncSession = Depends(get_async_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """Get trip plan."""
     plan = await trips_service.get_trip_plan(session, trip_id, current_user.id)
-    
+
     if not plan:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Trip plan not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Trip plan not found"
         )
-    
+
     return plan
 
 
@@ -192,15 +244,16 @@ async def get_trip_plan(
 async def get_trip_checklist(
     trip_id: str,
     session: AsyncSession = Depends(get_async_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """Get trip checklist."""
-    checklist = await trips_service.get_trip_checklist(session, trip_id, current_user.id)
-    
+    checklist = await trips_service.get_trip_checklist(
+        session, trip_id, current_user.id
+    )
+
     if not checklist:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Trip checklist not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Trip checklist not found"
         )
-    
+
     return checklist

@@ -1,7 +1,9 @@
 """Google Hotels service using SerpApi."""
 
 from typing import Any, Dict, Optional
+
 import httpx
+
 from app.core.settings import settings
 
 SERP_ENGINE = "google_hotels"
@@ -23,7 +25,7 @@ def _bool(val: Optional[bool]) -> Optional[str]:
 
 class GoogleHotelsService:
     """Service for fetching hotel data from SerpApi Google Hotels."""
-    
+
     def __init__(self, base_url: str | None = None):
         self.base_url = base_url or "https://serpapi.com/search.json"
         self.api_key = settings.serpapi_key
@@ -32,26 +34,22 @@ class GoogleHotelsService:
 
     async def search(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Search for hotels using Google Hotels via SerpApi."""
-        
+
         query: Dict[str, Any] = {
             "engine": SERP_ENGINE,
             "api_key": self.api_key,
-
             # Required
             "q": params["q"],
             "check_in_date": params["check_in_date"],
             "check_out_date": params["check_out_date"],
-
             # Optional localization
             "gl": params.get("gl"),
             "hl": params.get("hl"),
             "currency": params.get("currency"),
-
             # Occupancy
             "adults": params.get("adults"),
             "children": params.get("children"),
             "children_ages": _csv(params.get("children_ages")),
-
             # Filters
             "sort_by": params.get("sort_by"),
             "min_price": params.get("min_price"),
@@ -64,15 +62,12 @@ class GoogleHotelsService:
             "free_cancellation": _bool(params.get("free_cancellation")),
             "special_offers": _bool(params.get("special_offers")),
             "eco_certified": _bool(params.get("eco_certified")),
-
             # Vacation rentals
             "vacation_rentals": _bool(params.get("vacation_rentals")),
             "bedrooms": params.get("bedrooms"),
             "bathrooms": params.get("bathrooms"),
-
             # Pagination
             "next_page_token": params.get("next_page_token"),
-
             # SerpApi parameters
             "no_cache": _bool(params.get("no_cache")),
             "output": params.get("output") or "json",
@@ -97,12 +92,11 @@ class GoogleHotelsService:
 
     async def property_details(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Get detailed information for a specific property."""
-        
+
         query: Dict[str, Any] = {
             "engine": SERP_ENGINE,
             "api_key": self.api_key,
             "property_token": params["property_token"],
-
             # Context parameters
             "q": params.get("q"),
             "check_in_date": params["check_in_date"],
@@ -114,7 +108,7 @@ class GoogleHotelsService:
             "children": params.get("children", 0),
             "children_ages": _csv(params.get("children_ages")),
         }
-        
+
         # Drop None values
         query = {k: v for k, v in query.items() if v is not None}
 

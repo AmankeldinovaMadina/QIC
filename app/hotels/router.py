@@ -1,21 +1,21 @@
 """Hotels router with search, AI ranking, and selection endpoints."""
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth import get_current_user
+from app.db import User, get_async_session
+from app.hotels.ai_ranker import OpenAIHotelRanker
 from app.hotels.schemas import (
-    HotelSearchQuery,
     HotelPropertyDetailsQuery,
-    SerpApiRaw,
     HotelRankRequest,
     HotelRankResponse,
-    HotelSelectionRequest
+    HotelSearchQuery,
+    HotelSelectionRequest,
+    SerpApiRaw,
 )
 from app.hotels.service import GoogleHotelsService
-from app.hotels.ai_ranker import OpenAIHotelRanker
 from app.trips.service import trips_service
-from app.db import get_async_session, User
-from app.auth import get_current_user
 
 router = APIRouter(prefix="/hotels", tags=["hotels"])
 
@@ -29,14 +29,14 @@ def _svc() -> GoogleHotelsService:
 # Google Hotels Search Endpoints
 # ============================================================================
 
+
 @router.get("/search", response_model=SerpApiRaw)
 async def hotels_search(
-    q: HotelSearchQuery = Depends(),
-    svc: GoogleHotelsService = Depends(_svc)
+    q: HotelSearchQuery = Depends(), svc: GoogleHotelsService = Depends(_svc)
 ):
     """
     Search for hotels using Google Hotels via SerpApi.
-    
+
     Returns raw SerpApi response with hotel listings, prices, and details.
     """
     try:
@@ -48,12 +48,11 @@ async def hotels_search(
 
 @router.get("/property", response_model=SerpApiRaw)
 async def hotel_property_details(
-    q: HotelPropertyDetailsQuery = Depends(),
-    svc: GoogleHotelsService = Depends(_svc)
+    q: HotelPropertyDetailsQuery = Depends(), svc: GoogleHotelsService = Depends(_svc)
 ):
     """
     Get detailed information for a specific hotel property.
-    
+
     Requires a property_token from a search result.
     """
     try:
@@ -67,14 +66,15 @@ async def hotel_property_details(
 # AI Hotel Ranking Endpoint
 # ============================================================================
 
+
 @router.post("/rank", response_model=HotelRankResponse)
 async def rank_hotels(req: HotelRankRequest):
     """
     Rank hotels using AI-powered analysis.
-    
+
     Analyzes hotels based on user preferences and returns ranked results
     with scores, pros/cons keywords, and detailed rationale.
-    
+
     Uses OpenAI for intelligent ranking with heuristic fallback.
     """
     try:
@@ -96,28 +96,29 @@ async def rank_hotels_alias(req: HotelRankRequest):
 # Hotel Selection Endpoint (Save to Trip)
 # ============================================================================
 
+
 @router.post("/select")
 async def select_hotel_for_trip(
     req: HotelSelectionRequest,
     session: AsyncSession = Depends(get_async_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     Select a hotel and save it to a trip.
-    
+
     This endpoint takes a trip ID and complete hotel information,
     and stores it in the trip's database record.
     """
     try:
         print(f"🏨 Hotel selection for trip {req.trip_id}")
-        
+
         # Get the trip and verify ownership
         trip = await trips_service.get_trip_by_id(session, req.trip_id, current_user.id)
         if not trip:
             raise HTTPException(status_code=404, detail="Trip not found")
-        
+
         print(f"✅ Trip found: {trip.from_city} → {trip.to_city}")
-        
+
         # Update trip with hotel information
         trip.selected_hotel_id = req.hotel_id
         trip.selected_hotel_name = req.hotel_name
@@ -137,13 +138,13 @@ async def select_hotel_for_trip(
         trip.selected_hotel_pros = req.pros_keywords
         trip.selected_hotel_cons = req.cons_keywords
         trip.selected_hotel_thumbnail = req.thumbnail
-        
+
         # Save to database
         await session.commit()
         await session.refresh(trip)
-        
+
         print(f"✅ Hotel {req.hotel_name} saved successfully!")
-        
+
         # Return success response
         return {
             "success": True,
@@ -151,7 +152,7 @@ async def select_hotel_for_trip(
             "trip_id": str(trip.id),
             "trip": {
                 "destination": f"{trip.from_city} → {trip.to_city}",
-                "dates": f"{trip.start_date.date()} to {trip.end_date.date()}"
+                "dates": f"{trip.start_date.date()} to {trip.end_date.date()}",
             },
             "hotel": {
                 "name": req.hotel_name,
@@ -159,14 +160,15 @@ async def select_hotel_for_trip(
                 "price": f"${req.total_price} {req.currency} (${req.price_per_night}/night)",
                 "rating": f"{req.rating}/5" if req.rating else "N/A",
                 "check_in": req.check_in_date,
-                "check_out": req.check_out_date
-            }
+                "check_out": req.check_out_date,
+            },
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
         print(f"💥 ERROR: {e}")
         import traceback
+
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))

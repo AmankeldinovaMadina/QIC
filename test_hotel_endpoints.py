@@ -2,9 +2,10 @@
 Test suite for hotel endpoints: search, AI ranking, and selection.
 """
 
-import requests
 import json
 from datetime import datetime, timedelta
+
+import requests
 
 # Configuration
 BASE_URL = "http://localhost:8001"
@@ -14,7 +15,7 @@ API_BASE = f"{BASE_URL}/api/v1"
 test_data = {
     "username": f"hotel_test_user_{datetime.now().timestamp()}",
     "access_token": None,
-    "trip_id": None
+    "trip_id": None,
 }
 
 # Colors
@@ -60,24 +61,24 @@ def print_response(response):
 # Setup: Register and Create Trip
 # ============================================================================
 
+
 def test_setup():
     """Register user and create a trip."""
     print_test("Setup: Register User and Create Trip")
-    
+
     # Register
     response = requests.post(
-        f"{API_BASE}/auth/register",
-        json={"username": test_data["username"]}
+        f"{API_BASE}/auth/register", json={"username": test_data["username"]}
     )
     assert response.status_code == 200
     data = response.json()
     test_data["access_token"] = data["access_token"]
     print_success(f"User registered: {test_data['username']}")
-    
+
     # Create trip
     start_date = datetime.now() + timedelta(days=30)
     end_date = start_date + timedelta(days=5)
-    
+
     response = requests.post(
         f"{API_BASE}/trips",
         json={
@@ -87,14 +88,14 @@ def test_setup():
             "end_date": end_date.isoformat(),
             "transport": "flight",
             "adults": 2,
-            "budget_max": 5000.00
+            "budget_max": 5000.00,
         },
-        headers={"Authorization": f"Bearer {test_data['access_token']}"}
+        headers={"Authorization": f"Bearer {test_data['access_token']}"},
     )
     assert response.status_code == 200
     test_data["trip_id"] = response.json()["id"]
     print_success(f"Trip created: {test_data['trip_id']}")
-    
+
     return True
 
 
@@ -102,10 +103,11 @@ def test_setup():
 # Test 1: Hotel AI Ranking
 # ============================================================================
 
+
 def test_hotel_ranking():
     """Test AI hotel ranking endpoint."""
     print_test("Hotel AI Ranking")
-    
+
     try:
         # Sample hotels data
         payload = {
@@ -124,7 +126,7 @@ def test_hotel_ranking():
                     "hotel_class": 4,
                     "property_type": "Hotel",
                     "amenities": ["WiFi", "Breakfast", "Gym", "Pool", "Restaurant"],
-                    "free_cancellation": True
+                    "free_cancellation": True,
                 },
                 {
                     "id": "hotel_2",
@@ -138,7 +140,7 @@ def test_hotel_ranking():
                     "hotel_class": 2,
                     "property_type": "Hotel",
                     "amenities": ["WiFi", "Breakfast"],
-                    "free_cancellation": False
+                    "free_cancellation": False,
                 },
                 {
                     "id": "hotel_3",
@@ -151,30 +153,36 @@ def test_hotel_ranking():
                     "reviews_count": 2890,
                     "hotel_class": 5,
                     "property_type": "Luxury Hotel",
-                    "amenities": ["WiFi", "Breakfast", "Gym", "Pool", "Spa", "Restaurant", "Bar", "Concierge"],
-                    "free_cancellation": True
-                }
-            ]
+                    "amenities": [
+                        "WiFi",
+                        "Breakfast",
+                        "Gym",
+                        "Pool",
+                        "Spa",
+                        "Restaurant",
+                        "Bar",
+                        "Concierge",
+                    ],
+                    "free_cancellation": True,
+                },
+            ],
         }
-        
-        response = requests.post(
-            f"{API_BASE}/hotels/rank",
-            json=payload
-        )
+
+        response = requests.post(f"{API_BASE}/hotels/rank", json=payload)
         print_response(response)
-        
+
         assert response.status_code == 200, "Hotel ranking failed"
         data = response.json()
         assert "items" in data, "No ranked items in response"
         assert len(data["items"]) == 3, "Expected 3 ranked hotels"
-        
+
         # Store top hotel for selection test
         test_data["ranked_hotel"] = data["items"][0]
-        
+
         print_success(f"Hotels ranked! Top choice: {data['items'][0]['title']}")
         print_info(f"Score: {data['items'][0]['score']}")
         print_info(f"Pros: {', '.join(data['items'][0]['pros_keywords'][:3])}")
-        
+
         return True
     except Exception as e:
         print_error(f"Hotel ranking failed: {e}")
@@ -185,14 +193,15 @@ def test_hotel_ranking():
 # Test 2: Select Hotel for Trip
 # ============================================================================
 
+
 def test_select_hotel():
     """Test selecting a hotel and saving it to a trip."""
     print_test("Select Hotel for Trip")
-    
+
     try:
         check_in = (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d")
         check_out = (datetime.now() + timedelta(days=35)).strftime("%Y-%m-%d")
-        
+
         payload = {
             "trip_id": test_data["trip_id"],
             "hotel_id": "hotel_1",
@@ -211,22 +220,20 @@ def test_select_hotel():
             "score": test_data["ranked_hotel"]["score"],
             "title": test_data["ranked_hotel"]["title"],
             "pros_keywords": test_data["ranked_hotel"]["pros_keywords"],
-            "cons_keywords": test_data["ranked_hotel"]["cons_keywords"]
+            "cons_keywords": test_data["ranked_hotel"]["cons_keywords"],
         }
-        
+
         headers = {"Authorization": f"Bearer {test_data['access_token']}"}
         response = requests.post(
-            f"{API_BASE}/hotels/select",
-            json=payload,
-            headers=headers
+            f"{API_BASE}/hotels/select", json=payload, headers=headers
         )
         print_response(response)
-        
+
         assert response.status_code == 200, "Hotel selection failed"
         data = response.json()
         assert data["success"] == True, "Selection not successful"
         assert data["trip_id"] == test_data["trip_id"], "Trip ID mismatch"
-        
+
         print_success("Hotel selected and saved to trip!")
         return True
     except Exception as e:
@@ -238,31 +245,33 @@ def test_select_hotel():
 # Test 3: Verify Hotel Saved to Trip
 # ============================================================================
 
+
 def test_verify_hotel_saved():
     """Test that the selected hotel is saved in the trip."""
     print_test("Verify Hotel Saved to Trip")
-    
+
     try:
         headers = {"Authorization": f"Bearer {test_data['access_token']}"}
         response = requests.get(
-            f"{API_BASE}/trips/{test_data['trip_id']}",
-            headers=headers
+            f"{API_BASE}/trips/{test_data['trip_id']}", headers=headers
         )
         print_response(response)
-        
+
         assert response.status_code == 200, "Get trip failed"
         data = response.json()
         assert "selected_hotel" in data, "No selected_hotel in response"
         assert data["selected_hotel"] is not None, "selected_hotel is null"
-        assert data["selected_hotel"]["hotel_name"] == "Tokyo Grand Hotel", "Hotel name mismatch"
-        
+        assert (
+            data["selected_hotel"]["hotel_name"] == "Tokyo Grand Hotel"
+        ), "Hotel name mismatch"
+
         hotel = data["selected_hotel"]
         print_success("Hotel data verified in trip!")
         print_info(f"Hotel: {hotel['hotel_name']}")
         print_info(f"Location: {hotel['location']}")
         print_info(f"Price: ${hotel['total_price']} ({hotel['currency']})")
         print_info(f"Rating: {hotel['rating']}/5")
-        
+
         return True
     except Exception as e:
         print_error(f"Hotel verification failed: {e}")
@@ -273,6 +282,7 @@ def test_verify_hotel_saved():
 # Main Test Runner
 # ============================================================================
 
+
 def run_hotel_tests():
     """Run all hotel tests."""
     print(f"\n{BLUE}{'='*60}{RESET}")
@@ -280,16 +290,16 @@ def run_hotel_tests():
     print(f"{BLUE}{'='*60}{RESET}")
     print(f"{YELLOW}Base URL: {BASE_URL}{RESET}")
     print(f"{YELLOW}API Base: {API_BASE}{RESET}")
-    
+
     tests = [
         ("Setup", test_setup),
         ("Hotel AI Ranking", test_hotel_ranking),
         ("Select Hotel", test_select_hotel),
         ("Verify Hotel Saved", test_verify_hotel_saved),
     ]
-    
+
     results = []
-    
+
     for name, test_func in tests:
         try:
             result = test_func()
@@ -297,26 +307,26 @@ def run_hotel_tests():
         except Exception as e:
             print_error(f"Test '{name}' crashed: {e}")
             results.append((name, False))
-    
+
     # Print summary
     print(f"\n{BLUE}{'='*60}{RESET}")
     print(f"{BLUE}TEST SUMMARY{RESET}")
     print(f"{BLUE}{'='*60}{RESET}")
-    
+
     passed = sum(1 for _, result in results if result)
     failed = len(results) - passed
-    
+
     for name, result in results:
         status = f"{GREEN}✅ PASSED{RESET}" if result else f"{RED}❌ FAILED{RESET}"
         print(f"{name:.<40} {status}")
-    
+
     print(f"\n{BLUE}{'='*60}{RESET}")
     print(f"Total Tests: {len(results)}")
     print(f"{GREEN}Passed: {passed}{RESET}")
     print(f"{RED}Failed: {failed}{RESET}")
     print(f"Success Rate: {(passed/len(results)*100):.1f}%")
     print(f"{BLUE}{'='*60}{RESET}\n")
-    
+
     return passed == len(results)
 
 
@@ -330,5 +340,6 @@ if __name__ == "__main__":
     except Exception as e:
         print_error(f"Test suite failed: {e}")
         import traceback
+
         traceback.print_exc()
         exit(1)

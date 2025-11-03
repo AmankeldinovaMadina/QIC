@@ -1,21 +1,28 @@
 """Hotel search and property schemas for SerpApi Google Hotels."""
 
-from typing import Optional, List, Literal
+from typing import List, Literal, Optional
+
 from pydantic import BaseModel, Field, field_validator
 
 
 class HotelSearchQuery(BaseModel):
     """Query parameters for hotel search via SerpApi."""
-    
+
     # Required by Google Hotels via SerpApi
     q: str = Field(..., description="Search query, e.g. 'Bali Resorts' or 'Paris'")
     check_in_date: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$")
     check_out_date: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$")
 
     # Localization
-    gl: Optional[str] = Field(None, min_length=2, max_length=2, description="Country code, e.g. 'us'")
-    hl: Optional[str] = Field(None, min_length=2, max_length=2, description="Language code, e.g. 'en'")
-    currency: Optional[str] = Field(None, min_length=3, max_length=3, description="Currency code, e.g. 'USD'")
+    gl: Optional[str] = Field(
+        None, min_length=2, max_length=2, description="Country code, e.g. 'us'"
+    )
+    hl: Optional[str] = Field(
+        None, min_length=2, max_length=2, description="Language code, e.g. 'en'"
+    )
+    currency: Optional[str] = Field(
+        None, min_length=3, max_length=3, description="Currency code, e.g. 'USD'"
+    )
 
     # Occupancy
     adults: Optional[int] = Field(2, ge=1, le=20)
@@ -23,7 +30,9 @@ class HotelSearchQuery(BaseModel):
     children_ages: Optional[List[int]] = None
 
     # Advanced filters
-    sort_by: Optional[Literal[3, 8, 13]] = None  # 3=Lowest price, 8=Highest rating, 13=Most reviewed
+    sort_by: Optional[Literal[3, 8, 13]] = (
+        None  # 3=Lowest price, 8=Highest rating, 13=Most reviewed
+    )
     min_price: Optional[int] = Field(None, ge=0)
     max_price: Optional[int] = Field(None, ge=0)
     property_types: Optional[List[int]] = None
@@ -66,7 +75,7 @@ class HotelSearchQuery(BaseModel):
 
 class HotelPropertyDetailsQuery(BaseModel):
     """Query for specific hotel property details."""
-    
+
     property_token: str
     q: Optional[str] = None
     check_in_date: str
@@ -81,6 +90,7 @@ class HotelPropertyDetailsQuery(BaseModel):
 
 class SerpApiRaw(BaseModel):
     """Wrapper for raw SerpApi response."""
+
     data: dict
 
 
@@ -88,48 +98,51 @@ class SerpApiRaw(BaseModel):
 # AI Ranking Schemas (similar to flights)
 # ============================================================================
 
+
 class HotelForRanking(BaseModel):
     """Individual hotel data for AI ranking."""
-    
+
     id: str = Field(..., description="Unique hotel identifier (property_token)")
     name: str
     location: str = Field(..., description="Hotel address or area")
-    
+
     # Pricing
     price_per_night: float = Field(..., description="Price per night")
     total_price: float = Field(..., description="Total price for the stay")
     currency: str = Field(default="USD")
-    
+
     # Ratings and reviews
     rating: Optional[float] = Field(None, ge=0, le=5, description="Hotel rating (0-5)")
     reviews_count: Optional[int] = Field(None, ge=0)
-    
+
     # Property details
     hotel_class: Optional[int] = Field(None, ge=1, le=5, description="Star rating")
     property_type: Optional[str] = None  # "Hotel", "Resort", "Apartment", etc.
-    
+
     # Amenities
     amenities: Optional[List[str]] = Field(default_factory=list)
-    
+
     # Policies
     free_cancellation: Optional[bool] = None
-    
+
     # Images
     thumbnail: Optional[str] = None
 
 
 class HotelRankRequest(BaseModel):
     """Request to rank hotels using AI."""
-    
+
     search_id: str
     hotels: List[HotelForRanking]
-    preferences_prompt: str = Field(..., description="User preferences for hotel selection")
+    preferences_prompt: str = Field(
+        ..., description="User preferences for hotel selection"
+    )
     locale: Optional[dict] = None
 
 
 class HotelRankItem(BaseModel):
     """Individual ranked hotel result."""
-    
+
     id: str
     score: float = Field(..., ge=0.0, le=1.0)
     title: str = Field(..., max_length=140)
@@ -141,7 +154,7 @@ class HotelRankItem(BaseModel):
 
 class HotelRankMeta(BaseModel):
     """Metadata about the ranking process."""
-    
+
     used_model: str
     deterministic: bool
     notes: Optional[List[str]] = None
@@ -149,7 +162,7 @@ class HotelRankMeta(BaseModel):
 
 class HotelRankResponse(BaseModel):
     """Response containing ranked hotels."""
-    
+
     search_id: str
     ordered_ids: List[str]
     items: List[HotelRankItem]
@@ -160,51 +173,52 @@ class HotelRankResponse(BaseModel):
 # Hotel Selection Schemas (for saving to trip)
 # ============================================================================
 
+
 class HotelSelectionRequest(BaseModel):
     """Request to select a hotel and save it to a trip."""
-    
+
     trip_id: str
-    
+
     # Hotel identification
     hotel_id: str = Field(..., description="Property token or unique hotel ID")
     hotel_name: str
-    
+
     # Location
     location: str = Field(..., description="Hotel address or area")
-    
+
     # Pricing
     price_per_night: float
     total_price: float
     currency: str = Field(default="USD")
-    
+
     # Dates
     check_in_date: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$")
     check_out_date: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$")
-    
+
     # Ratings
     rating: Optional[float] = Field(None, ge=0, le=5)
     reviews_count: Optional[int] = None
     hotel_class: Optional[int] = Field(None, ge=1, le=5)
-    
+
     # Amenities
     amenities: Optional[List[str]] = None
-    
+
     # Policies
     free_cancellation: Optional[bool] = None
-    
+
     # AI ranking data
     score: Optional[float] = Field(None, ge=0.0, le=1.0)
     title: Optional[str] = None
     pros_keywords: Optional[List[str]] = None
     cons_keywords: Optional[List[str]] = None
-    
+
     # Images
     thumbnail: Optional[str] = None
 
 
 class HotelSelectionResponse(BaseModel):
     """Response after selecting a hotel."""
-    
+
     success: bool
     message: str
     trip_id: str
@@ -213,28 +227,28 @@ class HotelSelectionResponse(BaseModel):
 
 class SelectedHotelInfo(BaseModel):
     """Selected hotel information for a trip."""
-    
+
     hotel_id: str
     hotel_name: str
     location: str
-    
+
     price_per_night: float
     total_price: float
     currency: str
-    
+
     check_in_date: str
     check_out_date: str
-    
+
     rating: Optional[float] = None
     reviews_count: Optional[int] = None
     hotel_class: Optional[int] = None
-    
+
     amenities: Optional[List[str]] = None
     free_cancellation: Optional[bool] = None
-    
+
     score: Optional[float] = None
     title: Optional[str] = None
     pros_keywords: Optional[List[str]] = None
     cons_keywords: Optional[List[str]] = None
-    
+
     thumbnail: Optional[str] = None

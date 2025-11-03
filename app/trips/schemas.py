@@ -11,6 +11,7 @@ from app.db.models import TransportType, TripStatus
 
 class SelectedFlightInfo(BaseModel):
     """Selected flight information for a trip."""
+
     flight_id: str
     airline: str
     flight_number: str
@@ -35,6 +36,7 @@ SelectedHotelInfo = None
 
 class TripCreateRequest(BaseModel):
     """Trip creation request."""
+
     from_city: str = Field(..., min_length=1, max_length=100)
     to_city: str = Field(..., min_length=1, max_length=100)
     start_date: datetime
@@ -48,22 +50,29 @@ class TripCreateRequest(BaseModel):
     notes: Optional[str] = Field(default=None, max_length=5000)
     timezone: Optional[str] = Field(default=None, max_length=50)
 
-    @validator('end_date')
+    @validator("end_date")
     def end_date_after_start_date(cls, v, values):
-        if 'start_date' in values and v <= values['start_date']:
-            raise ValueError('end_date must be after start_date')
+        if "start_date" in values and v <= values["start_date"]:
+            raise ValueError("end_date must be after start_date")
         return v
 
-    @validator('budget_max')
+    @validator("budget_max")
     def budget_max_greater_than_min(cls, v, values):
-        if v is not None and 'budget_min' in values and values['budget_min'] is not None:
-            if v < values['budget_min']:
-                raise ValueError('budget_max must be greater than or equal to budget_min')
+        if (
+            v is not None
+            and "budget_min" in values
+            and values["budget_min"] is not None
+        ):
+            if v < values["budget_min"]:
+                raise ValueError(
+                    "budget_max must be greater than or equal to budget_min"
+                )
         return v
 
 
 class TripUpdateRequest(BaseModel):
     """Trip update request (partial updates)."""
+
     from_city: Optional[str] = Field(default=None, min_length=1, max_length=100)
     to_city: Optional[str] = Field(default=None, min_length=1, max_length=100)
     start_date: Optional[datetime] = None
@@ -81,6 +90,7 @@ class TripUpdateRequest(BaseModel):
 
 class TripResponse(BaseModel):
     """Trip response model."""
+
     id: str  # Changed from UUID to str for SQLite compatibility
     user_id: str
     from_city: str
@@ -99,10 +109,10 @@ class TripResponse(BaseModel):
     ics_token: str
     created_at: datetime
     updated_at: Optional[datetime]
-    
+
     # Selected flight information
     selected_flight: Optional[SelectedFlightInfo] = None
-    
+
     # Selected hotel information (will be Optional[SelectedHotelInfo])
     selected_hotel: Optional[dict] = None  # Using dict for now to avoid circular import
 
@@ -112,6 +122,7 @@ class TripResponse(BaseModel):
 
 class TripListResponse(BaseModel):
     """Trip list response."""
+
     trips: List[TripResponse]
     total: int
     page: int
@@ -120,6 +131,7 @@ class TripListResponse(BaseModel):
 
 class TripPlanResponse(BaseModel):
     """Trip plan response."""
+
     id: str
     trip_id: str
     plan_json: dict
@@ -131,6 +143,7 @@ class TripPlanResponse(BaseModel):
 
 class TripChecklistResponse(BaseModel):
     """Trip checklist response."""
+
     id: str
     trip_id: str
     checklist_json: dict
@@ -142,6 +155,7 @@ class TripChecklistResponse(BaseModel):
 
 class FlightSelectionRequest(BaseModel):
     """Request to select a flight for a trip."""
+
     trip_id: str
     flight_id: str
     airline: str
@@ -162,6 +176,7 @@ class FlightSelectionRequest(BaseModel):
 
 class FlightSelectionResponse(BaseModel):
     """Response after selecting a flight for a trip."""
+
     success: bool
     message: str
     trip: TripResponse

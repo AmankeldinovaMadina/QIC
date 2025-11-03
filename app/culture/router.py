@@ -1,9 +1,11 @@
 """Culture guide endpoint for travel etiquette tips."""
 
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field, field_validator
 from typing import List, Literal, Optional
+
+from fastapi import APIRouter, HTTPException
 from openai import OpenAI
+from pydantic import BaseModel, Field, field_validator
+
 from app.core.settings import settings
 
 router = APIRouter(prefix="/api/v1", tags=["culture"])
@@ -14,12 +16,20 @@ client = OpenAI(api_key=settings.openai_api_key)
 # --- Structured Output (Pydantic) ---
 
 TipCategory = Literal[
-    "greeting_etiquette", "dress_code", "behavioral_norms", "taboos",
-    "dining_etiquette", "tipping", "religion_holidays", "transport_customs",
+    "greeting_etiquette",
+    "dress_code",
+    "behavioral_norms",
+    "taboos",
+    "dining_etiquette",
+    "tipping",
+    "religion_holidays",
+    "transport_customs",
 ]
+
 
 class CultureTip(BaseModel):
     """Individual culture tip with actionable advice."""
+
     category: TipCategory
     title: str
     tip: str
@@ -27,8 +37,10 @@ class CultureTip(BaseModel):
     avoid: str
     emoji: str  # small UX flourish for frontend
 
+
 class CultureGuide(BaseModel):
     """Complete culture guide for a destination."""
+
     destination: str
     summary: str
     tips: List[CultureTip] = Field(..., min_items=3, max_items=4)
@@ -39,16 +51,22 @@ class CultureGuide(BaseModel):
         """Normalize destination by stripping whitespace."""
         return v.strip()
 
+
 # --- Request/Response Models ---
+
 
 class CultureGuideRequest(BaseModel):
     """Request model for culture guide endpoint."""
+
     destination: str
     language: Optional[Literal["en"]] = "en"  # keep it simple as requested
 
+
 class CultureGuideResponse(CultureGuide):
     """Response model for culture guide endpoint."""
+
     pass
+
 
 # --- System Prompt ---
 
@@ -63,20 +81,21 @@ SYSTEM_PROMPT = (
 
 # --- Endpoint ---
 
+
 @router.post("/culture-guide", response_model=CultureGuideResponse)
 def culture_guide(req: CultureGuideRequest):
     """
     Generate culture-specific travel etiquette tips for a destination.
-    
+
     Uses OpenAI Structured Outputs to guarantee JSON schema compliance.
     Returns 3-4 actionable tips covering greetings, dress code, dining, etc.
-    
+
     Args:
         req: CultureGuideRequest with destination and optional language
-        
+
     Returns:
         CultureGuideResponse with summary and structured tips
-        
+
     Raises:
         HTTPException: 502 if OpenAI API call fails
     """

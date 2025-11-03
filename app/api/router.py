@@ -3,10 +3,10 @@
 from fastapi import APIRouter
 
 from app.auth import auth_router
-from app.flights import flights_router
-from app.trips import trips_router
-from app.hotels import hotels_router
 from app.culture import culture_router
+from app.flights import flights_router
+from app.hotels import hotels_router
+from app.trips import trips_router
 
 # Create main API router
 api_router = APIRouter(prefix="/api/v1")

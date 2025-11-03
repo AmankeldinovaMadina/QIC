@@ -1,5 +1,8 @@
 """Database models for the travel planning application."""
 
+# Enums
+import enum
+import json
 import uuid
 from datetime import datetime
 from typing import List, Optional
@@ -19,13 +22,9 @@ from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.sqlite import JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from sqlalchemy.types import TypeDecorator, VARCHAR
-import json
+from sqlalchemy.types import VARCHAR, TypeDecorator
 
 from app.db.database import Base
-
-# Enums
-import enum
 
 
 class TransportType(str, enum.Enum):
@@ -53,15 +52,15 @@ class ItineraryItemType(str, enum.Enum):
 # Custom type for SQLite compatibility with arrays
 class JSONArray(TypeDecorator):
     """SQLite-compatible array type that stores arrays as JSON strings."""
-    
+
     impl = Text
     cache_ok = True
-    
+
     def process_bind_param(self, value, dialect):
         if value is not None:
             return json.dumps(value)
         return value
-    
+
     def process_result_value(self, value, dialect):
         if value is not None:
             return json.loads(value)
@@ -71,6 +70,7 @@ class JSONArray(TypeDecorator):
 # UUID type for SQLite
 try:
     from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
+
     UUID = PostgresUUID
 except ImportError:
     UUID = String(36)  # Use String for SQLite
@@ -123,7 +123,7 @@ class Trip(Base):
     ics_token = Column(String(36), default=lambda: str(uuid.uuid4()))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
+
     # Selected flight information
     selected_flight_id = Column(String(255), nullable=True)
     selected_flight_airline = Column(String(100), nullable=True)
@@ -140,7 +140,7 @@ class Trip(Base):
     selected_flight_title = Column(String(255), nullable=True)
     selected_flight_pros = Column(JSON, nullable=True)  # Array of pros keywords
     selected_flight_cons = Column(JSON, nullable=True)  # Array of cons keywords
-    
+
     # Selected hotel information
     selected_hotel_id = Column(String(255), nullable=True)
     selected_hotel_name = Column(String(255), nullable=True)
@@ -327,7 +327,9 @@ class CultureTip(Base):
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     country_code = Column(String(3), nullable=False, index=True)
     content_md = Column(Text, nullable=False)
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
 
 # Calendar integration models
@@ -348,13 +350,17 @@ class GoogleToken(Base):
     __tablename__ = "google_tokens"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    google_account_id = Column(String(36), ForeignKey("google_accounts.id"), nullable=False)
+    google_account_id = Column(
+        String(36), ForeignKey("google_accounts.id"), nullable=False
+    )
     access_token = Column(Text, nullable=False)
     refresh_token = Column(Text, nullable=True)
     token_type = Column(String(50), nullable=False, default="Bearer")
     scope = Column(String(500), nullable=True)
     expiry = Column(DateTime(timezone=True), nullable=True)
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
     # Relationships
     account = relationship("GoogleAccount", back_populates="tokens")
@@ -365,7 +371,9 @@ class CalendarBinding(Base):
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     trip_id = Column(String(36), ForeignKey("trips.id"), nullable=False)
-    google_account_id = Column(String(36), ForeignKey("google_accounts.id"), nullable=False)
+    google_account_id = Column(
+        String(36), ForeignKey("google_accounts.id"), nullable=False
+    )
     calendar_id = Column(String(255), nullable=False)
     sync_mode = Column(String(20), nullable=False)  # "push" or "ics"
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -376,7 +384,9 @@ class CalendarEvent(Base):
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     trip_id = Column(String(36), ForeignKey("trips.id"), nullable=False)
-    itinerary_item_id = Column(String(36), ForeignKey("itinerary_items.id"), nullable=False)
+    itinerary_item_id = Column(
+        String(36), ForeignKey("itinerary_items.id"), nullable=False
+    )
     google_event_id = Column(String(255), nullable=False)
     etag = Column(String(255), nullable=True)
     last_synced_at = Column(DateTime(timezone=True), server_default=func.now())

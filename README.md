@@ -40,6 +40,16 @@ A FastAPI service that aggregates hidden places from OpenTripMap & OpenStreetMap
 - **Visual Indicators**: Emoji support for better UX
 - **Production-Ready**: Proper error handling and validation
 
+### 🤖 AI Trip Planning
+- **Automated Daily Itinerary**: OpenAI generates detailed day-by-day plans
+- **Structured Outputs**: Type-safe trip plans with guaranteed schema compliance
+- **Context-Aware Planning**: Considers selected flights, hotels, and preferences
+- **Smart Scheduling**: Respects wake windows, mealtimes, travel times, and jet lag
+- **Flexible Pacing**: Choose from chill, balanced, or intense itineraries
+- **Transportation Recommendations**: Suggests best transport for each activity
+- **Priority System**: Events marked as essential, nice-to-have, or optional
+- **Database Storage**: Generated plans stored for retrieval and modification
+
 ## Setup
 
 1. **Install dependencies:**
