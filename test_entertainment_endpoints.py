@@ -48,9 +48,7 @@ def test_setup():
 
     # Register
     username = f"entertainment_user_{__import__('time').time()}"
-    resp = requests.post(
-        f"{BASE_URL}/auth/register", json={"username": username}
-    )
+    resp = requests.post(f"{BASE_URL}/auth/register", json={"username": username})
 
     if resp.status_code != 200:
         print_error(f"Registration failed: {resp.text}")
@@ -125,7 +123,9 @@ def test_search_venues():
         rating_str = f"{venue['rating']}★" if venue.get("rating") else "No rating"
         price_str = venue.get("price", "")
         print(f"  • {venue['title']}")
-        print(f"    Type: {venue.get('type', 'N/A')} | {rating_str} ({venue.get('reviews', 0)} reviews) {price_str}")
+        print(
+            f"    Type: {venue.get('type', 'N/A')} | {rating_str} ({venue.get('reviews', 0)} reviews) {price_str}"
+        )
         if venue.get("address"):
             print(f"    Address: {venue['address']}")
 
@@ -165,13 +165,17 @@ def test_rank_venues():
     print(f"\n{YELLOW}Top 10 Recommendations:{RESET}")
     for i, item in enumerate(result["items"][:10], 1):
         # Find original venue data
-        venue = next((v for v in test_data["venues"] if v["place_id"] == item["place_id"]), None)
+        venue = next(
+            (v for v in test_data["venues"] if v["place_id"] == item["place_id"]), None
+        )
 
         print(f"\n{i}. {item['title']} (Score: {item['score']:.2f})")
         if venue:
             print(f"   Name: {venue['title']}")
             rating_str = f"{venue['rating']}★" if venue.get("rating") else "No rating"
-            print(f"   {venue.get('type', 'N/A')} | {rating_str} ({venue.get('reviews', 0)} reviews)")
+            print(
+                f"   {venue.get('type', 'N/A')} | {rating_str} ({venue.get('reviews', 0)} reviews)"
+            )
         print(f"   Why: {item['rationale_short']}")
         print(f"   Pros: {', '.join(item['pros_keywords'])}")
         print(f"   Cons: {', '.join(item['cons_keywords'])}")
@@ -192,12 +196,16 @@ def test_select_venues():
     selections = []
     for i, item in enumerate(test_data["ranked_items"][:5]):
         # Find original venue data
-        venue = next((v for v in test_data["venues"] if v["place_id"] == item["place_id"]), None)
+        venue = next(
+            (v for v in test_data["venues"] if v["place_id"] == item["place_id"]), None
+        )
         if venue:
-            selections.append({
-                "venue": venue,
-                "ranking": item,
-            })
+            selections.append(
+                {
+                    "venue": venue,
+                    "ranking": item,
+                }
+            )
 
     select_payload = {
         "trip_id": test_data["trip_id"],
@@ -257,7 +265,9 @@ def test_get_selections():
         if sel.get("address"):
             print(f"    Address: {sel['address']}")
         if sel.get("rating"):
-            print(f"    Rating: {sel['rating']}★ ({sel.get('reviews_count', 0)} reviews)")
+            print(
+                f"    Rating: {sel['rating']}★ ({sel.get('reviews_count', 0)} reviews)"
+            )
         if sel.get("price_level"):
             print(f"    Price: {sel['price_level']}")
         if sel.get("website"):
@@ -282,9 +292,7 @@ def test_verify_trip():
 
     headers = {"Authorization": f"Bearer {test_data['token']}"}
 
-    resp = requests.get(
-        f"{BASE_URL}/trips/{test_data['trip_id']}", headers=headers
-    )
+    resp = requests.get(f"{BASE_URL}/trips/{test_data['trip_id']}", headers=headers)
 
     if resp.status_code != 200:
         print_error(f"Failed to retrieve trip: {resp.text}")
@@ -294,7 +302,9 @@ def test_verify_trip():
 
     # Check selected_entertainments field
     if trip.get("selected_entertainments"):
-        print_success(f"Trip has {len(trip['selected_entertainments'])} entertainment venues")
+        print_success(
+            f"Trip has {len(trip['selected_entertainments'])} entertainment venues"
+        )
         print_info("Entertainment data is stored in trip for AI planning")
     else:
         print_error("Trip does not have selected_entertainments field")
@@ -332,6 +342,7 @@ def run_all_tests():
         except Exception as e:
             print_error(f"Test exception: {e}")
             import traceback
+
             traceback.print_exc()
             results.append((test_name, False))
             break

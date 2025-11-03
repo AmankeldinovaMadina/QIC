@@ -171,7 +171,9 @@ class Trip(Base):
     flight_searches = relationship("FlightSearch", back_populates="trip")
     hotel_searches = relationship("HotelSearch", back_populates="trip")
     activity_searches = relationship("ActivitySearch", back_populates="trip")
-    entertainment_selections = relationship("EntertainmentSelection", back_populates="trip")
+    entertainment_selections = relationship(
+        "EntertainmentSelection", back_populates="trip"
+    )
     itinerary_items = relationship("ItineraryItem", back_populates="trip")
 
 

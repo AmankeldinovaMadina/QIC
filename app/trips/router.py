@@ -74,6 +74,7 @@ async def get_trip(
     if trip.selected_entertainments:
         if isinstance(trip.selected_entertainments, str):
             import json
+
             try:
                 selected_entertainments = json.loads(trip.selected_entertainments)
             except:

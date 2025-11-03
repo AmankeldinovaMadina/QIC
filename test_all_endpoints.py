@@ -664,7 +664,9 @@ def test_search_entertainment():
 
         print_success(f"Found {len(data['venues'])} entertainment venues!")
         print_info(f"Query: {data['query']}")
-        print_info(f"Sample venues: {', '.join([v['title'] for v in data['venues'][:3]])}")
+        print_info(
+            f"Sample venues: {', '.join([v['title'] for v in data['venues'][:3]])}"
+        )
 
         return True
     except Exception as e:
@@ -704,10 +706,17 @@ def test_rank_entertainment():
 
         print_success(f"Ranked {len(data['items'])} venues!")
         print_info(f"Model: {data['meta']['used_model']}")
-        
+
         # Show top 3
         for i, item in enumerate(data["items"][:3], 1):
-            venue = next((v for v in test_data["entertainment_venues"] if v["place_id"] == item["place_id"]), None)
+            venue = next(
+                (
+                    v
+                    for v in test_data["entertainment_venues"]
+                    if v["place_id"] == item["place_id"]
+                ),
+                None,
+            )
             if venue:
                 print_info(f"{i}. {venue['title']} (Score: {item['score']:.2f})")
 
@@ -731,7 +740,11 @@ def test_select_entertainment():
         selections = []
         for i, item in enumerate(test_data["entertainment_ranked_items"][:5]):
             venue = next(
-                (v for v in test_data["entertainment_venues"] if v["place_id"] == item["place_id"]),
+                (
+                    v
+                    for v in test_data["entertainment_venues"]
+                    if v["place_id"] == item["place_id"]
+                ),
                 None,
             )
             if venue:

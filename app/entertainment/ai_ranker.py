@@ -35,9 +35,7 @@ class OpenAIEntertainmentRanker:
         limited_venues = request.venues[:15]
 
         try:
-            print(
-                f"DEBUG: Attempting to call OpenAI for {len(limited_venues)} venues"
-            )
+            print(f"DEBUG: Attempting to call OpenAI for {len(limited_venues)} venues")
             # Call OpenAI with JSON schema
             response = await self._call_openai(request, limited_venues)
 

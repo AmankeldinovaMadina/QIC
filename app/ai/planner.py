@@ -184,18 +184,20 @@ def _build_planning_context(trip: Trip) -> Dict[str, Any]:
 
     # Add selected entertainment venues if available
     if trip.selected_entertainments and len(trip.selected_entertainments) > 0:
-        entertainment_notes = "\n\nSelected Entertainment Venues (user wants to visit these):\n"
+        entertainment_notes = (
+            "\n\nSelected Entertainment Venues (user wants to visit these):\n"
+        )
         for i, ent_data in enumerate(trip.selected_entertainments, 1):
             if isinstance(ent_data, dict):
                 venue = ent_data.get("venue", {})
                 ranking = ent_data.get("ranking", {})
-                
+
                 venue_name = venue.get("title", "Unknown")
                 venue_type = venue.get("type", "")
                 address = venue.get("address", "")
                 rating = venue.get("rating", "")
                 pros = ranking.get("pros_keywords", [])
-                
+
                 entertainment_notes += f"{i}. {venue_name}"
                 if venue_type:
                     entertainment_notes += f" ({venue_type})"
@@ -204,7 +206,7 @@ def _build_planning_context(trip: Trip) -> Dict[str, Any]:
                 entertainment_notes += f"\n   Address: {address}\n"
                 if pros:
                     entertainment_notes += f"   Highlights: {', '.join(pros[:4])}\n"
-        
+
         if context.get("notes"):
             context["notes"] += entertainment_notes
         else:

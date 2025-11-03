@@ -55,16 +55,17 @@ ON entertainment_selections(venue_id);
 def run_migration():
     """Run the database migration."""
     import asyncio
-    from app.db.database import engine
+
     from sqlalchemy import text
-    
+
+    from app.db.database import engine
+
     async def execute_migration():
         async with engine.begin() as conn:
             # Execute statements in order
             statements = [
                 # 1. Add selected_entertainments column to trips
                 "ALTER TABLE trips ADD COLUMN selected_entertainments TEXT",
-                
                 # 2. Create entertainment_selections table
                 """CREATE TABLE IF NOT EXISTS entertainment_selections (
                     id TEXT PRIMARY KEY,
@@ -91,12 +92,11 @@ def run_migration():
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (trip_id) REFERENCES trips (id)
                 )""",
-                
                 # 3. Create indexes
                 "CREATE INDEX IF NOT EXISTS idx_entertainment_selections_trip_id ON entertainment_selections(trip_id)",
                 "CREATE INDEX IF NOT EXISTS idx_entertainment_selections_venue_id ON entertainment_selections(venue_id)",
             ]
-            
+
             for stmt in statements:
                 stmt = stmt.strip()
                 if stmt:
@@ -111,9 +111,9 @@ def run_migration():
                         else:
                             print(f"✗ Error: {e}")
                             raise
-            
+
             print("\n✅ Migration completed successfully!")
-    
+
     asyncio.run(execute_migration())
 
 
@@ -127,9 +127,9 @@ if __name__ == "__main__":
     print("3. Indexes for performance")
     print("\nStarting migration...")
     print("-" * 70)
-    
+
     run_migration()
-    
+
     print("\n" + "=" * 70)
     print("Migration complete! You can now use the entertainment endpoints.")
     print("=" * 70)

@@ -58,7 +58,9 @@ class EntertainmentSearchRequest(BaseModel):
 
     trip_id: str
     destination: str  # City name
-    query: Optional[str] = None  # Optional custom query, otherwise uses entertainment_tags
+    query: Optional[str] = (
+        None  # Optional custom query, otherwise uses entertainment_tags
+    )
     latitude: Optional[float] = None  # For GPS-based search
     longitude: Optional[float] = None
     zoom: Optional[str] = "14z"  # Map zoom level
@@ -81,7 +83,9 @@ class EntertainmentRankRequest(BaseModel):
     trip_id: str
     search_id: str
     venues: List[GoogleMapsVenue]
-    preferences_prompt: Optional[str] = None  # Custom preferences, or uses entertainment_tags
+    preferences_prompt: Optional[str] = (
+        None  # Custom preferences, or uses entertainment_tags
+    )
     entertainment_tags: Optional[List[str]] = None  # From trip
 
 

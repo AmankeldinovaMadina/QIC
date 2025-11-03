@@ -25,16 +25,20 @@ class GoogleMapsService:
         self.base_url = "https://serpapi.com/search.json"
 
     async def search_venues(
-        self, request: EntertainmentSearchRequest, entertainment_tags: Optional[List[str]] = None
+        self,
+        request: EntertainmentSearchRequest,
+        entertainment_tags: Optional[List[str]] = None,
     ) -> EntertainmentSearchResponse:
         """Search for entertainment venues using Google Maps API."""
-        
+
         # Build search query based on entertainment_tags or custom query
         if request.query:
             search_query = request.query
         elif entertainment_tags:
             # Convert entertainment tags to search query
-            search_query = self._build_query_from_tags(entertainment_tags, request.destination)
+            search_query = self._build_query_from_tags(
+                entertainment_tags, request.destination
+            )
         else:
             search_query = f"entertainment in {request.destination}"
 
