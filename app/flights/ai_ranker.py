@@ -1,62 +1,72 @@
 """OpenAI client for flight ranking and analysis."""
 
-import json
 import asyncio
-from typing import List, Optional, Dict, Any
+import json
+from typing import Any, Dict, List, Optional
+
 from openai import AsyncOpenAI
 
 from app.core.settings import settings
-from app.flights.schemas import RankRequest, RankResponse, RankItem, RankMeta, Itinerary
+from app.flights.schemas import Itinerary, RankItem, RankMeta, RankRequest, RankResponse
 
 
 class OpenAIFlightRanker:
     """OpenAI client for ranking flights with pros/cons analysis."""
-    
+
     def __init__(self):
         from app.core.settings import settings
+
         print(f"DEBUG: openai_api_key exists: {bool(settings.openai_api_key)}")
-        print(f"DEBUG: openai_api_key starts with: {settings.openai_api_key[:10] if settings.openai_api_key else 'None'}...")
+        print(
+            f"DEBUG: openai_api_key starts with: {settings.openai_api_key[:10] if settings.openai_api_key else 'None'}..."
+        )
         if not settings.openai_api_key:
-            raise RuntimeError("OPENAI_API_KEY missing. Ensure .env is loaded in the app process.")
+            raise RuntimeError(
+                "OPENAI_API_KEY missing. Ensure .env is loaded in the app process."
+            )
         self.client = AsyncOpenAI(api_key=settings.openai_api_key)
         self.model = getattr(settings, "OPENAI_MODEL", None) or "gpt-4o-mini"
         print(f"DEBUG: OpenAI client initialized successfully")
-        
+
     async def rank_flights(self, request: RankRequest) -> RankResponse:
         """Rank flights using OpenAI with structured output."""
         # Limit to 30 flights for cost control
         limited_flights = request.flights[:30]
-        
+
         try:
-            print(f"DEBUG: Attempting to call OpenAI for {len(limited_flights)} flights")
+            print(
+                f"DEBUG: Attempting to call OpenAI for {len(limited_flights)} flights"
+            )
             # Call OpenAI with JSON schema
             response = await self._call_openai(request, limited_flights)
-            
+
             print(f"DEBUG: OpenAI call successful")
             # Validate and return
             return self._parse_openai_response(response, request.search_id)
-            
+
         except Exception as e:
             print(f"OpenAI ranking failed: {e}")
             # Fallback to heuristic ranking
             return self._heuristic_ranking(request)
         limited_flights = request.flights[:30]
-        
+
         try:
             # Call OpenAI with JSON schema
             response = await self._call_openai(request, limited_flights)
-            
+
             # Validate and return
             return self._parse_openai_response(response, request.search_id)
-            
+
         except Exception as e:
             print(f"OpenAI ranking failed: {e}")
             # Fallback to heuristic ranking
             return self._heuristic_ranking(request)
-    
-    async def _call_openai(self, request: RankRequest, flights: List[Itinerary]) -> Dict[str, Any]:
+
+    async def _call_openai(
+        self, request: RankRequest, flights: List[Itinerary]
+    ) -> Dict[str, Any]:
         """Call OpenAI API with structured JSON schema."""
-        
+
         # Define the JSON schema for response
         response_schema = {
             "type": "object",
@@ -65,13 +75,20 @@ class OpenAIFlightRanker:
                 "ordered_ids": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "minItems": 1
+                    "minItems": 1,
                 },
                 "items": {
                     "type": "array",
                     "items": {
                         "type": "object",
-                        "required": ["id", "score", "title", "rationale_short", "pros_keywords", "cons_keywords"],
+                        "required": [
+                            "id",
+                            "score",
+                            "title",
+                            "rationale_short",
+                            "pros_keywords",
+                            "cons_keywords",
+                        ],
                         "properties": {
                             "id": {"type": "string"},
                             "score": {"type": "number", "minimum": 0, "maximum": 1},
@@ -80,16 +97,16 @@ class OpenAIFlightRanker:
                             "pros_keywords": {
                                 "type": "array",
                                 "items": {"type": "string"},
-                                "maxItems": 8
+                                "maxItems": 8,
                             },
                             "cons_keywords": {
-                                "type": "array", 
+                                "type": "array",
                                 "items": {"type": "string"},
-                                "maxItems": 8
-                            }
+                                "maxItems": 8,
+                            },
                         },
-                        "additionalProperties": False
-                    }
+                        "additionalProperties": False,
+                    },
                 },
                 "meta": {
                     "type": "object",
@@ -97,23 +114,20 @@ class OpenAIFlightRanker:
                     "properties": {
                         "used_model": {"type": "string"},
                         "deterministic": {"type": "boolean"},
-                        "notes": {
-                            "type": "array",
-                            "items": {"type": "string"}
-                        }
+                        "notes": {"type": "array", "items": {"type": "string"}},
                     },
-                    "additionalProperties": False
-                }
+                    "additionalProperties": False,
+                },
             },
-            "additionalProperties": False
+            "additionalProperties": False,
         }
-        
+
         # Build system prompt
         system_prompt = self._build_system_prompt()
-        
+
         # Build user prompt with flight data
         user_prompt = self._build_user_prompt(request, flights)
-        
+
         # Call OpenAI
         completion = await self.client.chat.completions.create(
             model=self.model,
@@ -125,19 +139,19 @@ class OpenAIFlightRanker:
                 "json_schema": {
                     "name": "FlightRankResult",
                     "schema": response_schema,
-                    "strict": True
-                }
+                    "strict": True,
+                },
             },
             messages=[
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ]
+                {"role": "user", "content": user_prompt},
+            ],
         )
-        
+
         # Parse response
         content = completion.choices[0].message.content
         return json.loads(content)
-    
+
     def _build_system_prompt(self) -> str:
         """Build system prompt for flight ranking."""
         return """You are a flight concierge expert. Rank flight itineraries based on user preferences.
@@ -159,11 +173,11 @@ For each flight, provide:
 - Optional tags for special categories
 
 Return ONLY valid JSON matching the exact schema."""
-    
+
     def _build_user_prompt(self, request: RankRequest, flights: List[Itinerary]) -> str:
         """Build user prompt with preferences and flight data."""
         locale = request.locale
-        
+
         # Prepare compact flight data for the model
         flight_data = []
         for flight in flights:
@@ -171,7 +185,7 @@ Return ONLY valid JSON matching the exact schema."""
                 "id": flight.id,
                 "price": {
                     "amount": float(flight.price.amount),
-                    "currency": flight.price.currency
+                    "currency": flight.price.currency,
                 },
                 "total_duration_min": flight.total_duration_min,
                 "stops": flight.stops,
@@ -185,31 +199,33 @@ Return ONLY valid JSON matching the exact schema."""
                         "arr_time": leg.arr_time.isoformat(),
                         "marketing": leg.marketing,
                         "flight_no": leg.flight_no,
-                        "duration_min": leg.duration_min
+                        "duration_min": leg.duration_min,
                     }
                     for leg in flight.legs
-                ]
+                ],
             }
             flight_data.append(flight_summary)
-        
+
         prompt_data = {
             "preferences_prompt": request.preferences_prompt,
             "locale": {
                 "hl": locale.hl if locale else "en",
                 "currency": locale.currency if locale else "USD",
-                "tz": locale.tz if locale else None
+                "tz": locale.tz if locale else None,
             },
-            "flights": flight_data
+            "flights": flight_data,
         }
-        
+
         return json.dumps(prompt_data, indent=2)
-    
-    def _parse_openai_response(self, response: Dict[str, Any], search_id: str) -> RankResponse:
+
+    def _parse_openai_response(
+        self, response: Dict[str, Any], search_id: str
+    ) -> RankResponse:
         """Parse and validate OpenAI response."""
         ordered_ids = response.get("ordered_ids", [])
         items_data = response.get("items", [])
         meta_data = response.get("meta", {})
-        
+
         # Parse items
         items = []
         for item_data in items_data:
@@ -220,48 +236,45 @@ Return ONLY valid JSON matching the exact schema."""
                 rationale_short=item_data["rationale_short"],
                 pros_keywords=item_data["pros_keywords"],
                 cons_keywords=item_data["cons_keywords"],
-                tags=item_data.get("tags")
+                tags=item_data.get("tags"),
             )
             items.append(item)
-        
+
         # Parse metadata
         meta = RankMeta(
             used_model=meta_data.get("used_model", self.model),
             deterministic=meta_data.get("deterministic", True),
-            notes=meta_data.get("notes")
+            notes=meta_data.get("notes"),
         )
-        
+
         return RankResponse(
-            search_id=search_id,
-            ordered_ids=ordered_ids,
-            items=items,
-            meta=meta
+            search_id=search_id, ordered_ids=ordered_ids, items=items, meta=meta
         )
-    
+
     def _heuristic_ranking(self, request: RankRequest) -> RankResponse:
         """Fallback heuristic ranking when OpenAI is unavailable."""
         flights = request.flights[:30]  # Limit for consistency
-        
+
         # Sort by: price asc -> stops asc -> duration asc
         sorted_flights = sorted(
             flights,
-            key=lambda f: (float(f.price.amount), f.stops, f.total_duration_min)
+            key=lambda f: (float(f.price.amount), f.stops, f.total_duration_min),
         )
-        
+
         ordered_ids = [f.id for f in sorted_flights]
         items = []
-        
+
         for i, flight in enumerate(sorted_flights):
             # Generate basic pros/cons
             pros = self._generate_heuristic_pros(flight, i == 0)
             cons = self._generate_heuristic_cons(flight)
-            
+
             # Simple scoring (best to worst)
             score = max(0.1, 1.0 - (i * 0.1))
-            
+
             # Generate title
             title = self._generate_heuristic_title(flight)
-            
+
             item = RankItem(
                 id=flight.id,
                 score=score,
@@ -269,45 +282,42 @@ Return ONLY valid JSON matching the exact schema."""
                 rationale_short=f"Ranked #{i+1} by price, stops, and duration",
                 pros_keywords=pros,
                 cons_keywords=cons,
-                tags=["heuristic"] if i == 0 else None
+                tags=["heuristic"] if i == 0 else None,
             )
             items.append(item)
-        
+
         meta = RankMeta(
             used_model="heuristic_fallback",
             deterministic=True,
-            notes=["OpenAI unavailable, used heuristic ranking"]
+            notes=["OpenAI unavailable, used heuristic ranking"],
         )
-        
+
         return RankResponse(
-            search_id=request.search_id,
-            ordered_ids=ordered_ids,
-            items=items,
-            meta=meta
+            search_id=request.search_id, ordered_ids=ordered_ids, items=items, meta=meta
         )
-    
+
     def _generate_heuristic_pros(self, flight: Itinerary, is_best: bool) -> List[str]:
         """Generate heuristic pros keywords."""
         pros = []
-        
+
         if is_best:
             pros.append("lowest price")
-        
+
         if flight.stops == 0:
             pros.append("nonstop")
         elif flight.stops == 1:
             pros.append("1 stop")
-            
+
         if flight.layovers_min:
             if all(layover >= 60 and layover <= 120 for layover in flight.layovers_min):
                 pros.append("reasonable layovers")
-        
+
         if flight.total_duration_min < 360:  # Less than 6 hours
             pros.append("short flight")
-            
+
         if flight.emissions_kg and flight.emissions_kg < 500:
             pros.append("low emissions")
-        
+
         # Check for good departure/arrival times
         for leg in flight.legs:
             if 6 <= leg.dep_time.hour <= 10:
@@ -316,45 +326,49 @@ Return ONLY valid JSON matching the exact schema."""
             elif 14 <= leg.dep_time.hour <= 18:
                 pros.append("afternoon departure")
                 break
-        
+
         return pros[:5]  # Limit to 5
-    
+
     def _generate_heuristic_cons(self, flight: Itinerary) -> List[str]:
         """Generate heuristic cons keywords."""
         cons = []
-        
+
         if flight.stops >= 2:
             cons.append("multiple stops")
-        
+
         if flight.layovers_min:
             if any(layover < 60 for layover in flight.layovers_min):
                 cons.append("tight connection")
             elif any(layover > 300 for layover in flight.layovers_min):
                 cons.append("long layover")
-        
+
         if flight.total_duration_min > 720:  # More than 12 hours
             cons.append("long flight")
-        
+
         # Check for red-eye flights
         for leg in flight.legs:
             if leg.dep_time.hour >= 22 or leg.dep_time.hour <= 5:
                 cons.append("red-eye")
                 break
-        
+
         return cons[:5]  # Limit to 5
-    
+
     def _generate_heuristic_title(self, flight: Itinerary) -> str:
         """Generate heuristic title."""
-        stops_text = "Nonstop" if flight.stops == 0 else f"{flight.stops} stop{'s' if flight.stops > 1 else ''}"
+        stops_text = (
+            "Nonstop"
+            if flight.stops == 0
+            else f"{flight.stops} stop{'s' if flight.stops > 1 else ''}"
+        )
         duration_hours = flight.total_duration_min // 60
         duration_mins = flight.total_duration_min % 60
         duration_text = f"{duration_hours}h{duration_mins:02d}m"
-        
+
         airlines = list(set(leg.marketing for leg in flight.legs if leg.marketing))
         airline_text = airlines[0] if airlines else "Multi"
-        
+
         price_text = f"${int(flight.price.amount)}"
-        
+
         return f"{stops_text} • {duration_text} • {airline_text} • {price_text}"
 
 

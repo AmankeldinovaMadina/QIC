@@ -8,16 +8,16 @@ router = APIRouter(prefix="/flights", tags=["flights"])
 
 @router.post("/rank", response_model=RankResponse)
 async def rank_flights(req: RankRequest):
-	"""Rank flight itineraries using AI (or heuristic fallback)."""
-	try:
-		ranker = OpenAIFlightRanker()
-		result = await ranker.rank_flights(req)
-		return result
-	except Exception as e:
-		print(f"ERROR in rank_flights: {e}")
-		# If OpenAI unavailable, use heuristic fallback directly
-		# This should not happen since OpenAIFlightRanker has internal fallback
-		raise HTTPException(status_code=500, detail=str(e))
+    """Rank flight itineraries using AI (or heuristic fallback)."""
+    try:
+        ranker = OpenAIFlightRanker()
+        result = await ranker.rank_flights(req)
+        return result
+    except Exception as e:
+        print(f"ERROR in rank_flights: {e}")
+        # If OpenAI unavailable, use heuristic fallback directly
+        # This should not happen since OpenAIFlightRanker has internal fallback
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/ai-rank", response_model=RankResponse)

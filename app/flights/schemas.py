@@ -1,18 +1,21 @@
 """Flight-related Pydantic schemas."""
 
 from datetime import datetime
-from typing import List, Optional, Dict, Any
+from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel, Field
 
 
 class Price(BaseModel):
     """Price information."""
+
     amount: float
     currency: str
 
 
 class FlightLeg(BaseModel):
     """Individual flight leg information."""
+
     dep_iata: str
     dep_time: datetime
     arr_iata: str
@@ -24,6 +27,7 @@ class FlightLeg(BaseModel):
 
 class Itinerary(BaseModel):
     """Flight itinerary information."""
+
     id: str
     price: Price
     total_duration_min: int
@@ -35,6 +39,7 @@ class Itinerary(BaseModel):
 
 class Locale(BaseModel):
     """Locale preferences."""
+
     hl: Optional[str] = "en"
     currency: Optional[str] = "USD"
     tz: Optional[str] = None
@@ -42,6 +47,7 @@ class Locale(BaseModel):
 
 class RankRequest(BaseModel):
     """Request for flight ranking."""
+
     search_id: str
     flights: List[Itinerary]
     preferences_prompt: str
@@ -50,6 +56,7 @@ class RankRequest(BaseModel):
 
 class RankItem(BaseModel):
     """Individual ranked flight item."""
+
     id: str
     score: float = Field(ge=0.0, le=1.0)
     title: str = Field(max_length=140)
@@ -61,6 +68,7 @@ class RankItem(BaseModel):
 
 class RankMeta(BaseModel):
     """Metadata about the ranking process."""
+
     used_model: str
     deterministic: bool
     notes: Optional[List[str]] = None
@@ -68,6 +76,7 @@ class RankMeta(BaseModel):
 
 class RankResponse(BaseModel):
     """Response containing ranked flights."""
+
     search_id: str
     ordered_ids: List[str]
     items: List[RankItem]
@@ -77,6 +86,7 @@ class RankResponse(BaseModel):
 # Additional schemas for the test
 class Segment(BaseModel):
     """Flight segment for testing."""
+
     airline: str
     flight_number: str
     departure_airport: str

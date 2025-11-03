@@ -1,15 +1,16 @@
 """Test script to check if the AI ranker is working."""
 
 import asyncio
-import sys
 import os
+import sys
 from datetime import datetime
 
 # Add the app directory to the Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from app.flights.ai_ranker import OpenAIFlightRanker
-from app.flights.schemas import RankRequest, Itinerary, Segment, Price, FlightLeg
+from app.flights.schemas import FlightLeg, Itinerary, Price, RankRequest, Segment
+
 
 async def test_ai_ranker():
     """Test the AI ranker with sample flight data."""
@@ -30,9 +31,9 @@ async def test_ai_ranker():
                     arr_time=datetime.fromisoformat("2024-12-16T06:45:00"),
                     marketing="Emirates",
                     flight_no="EK201",
-                    duration_min=855
+                    duration_min=855,
                 )
-            ]
+            ],
         ),
         Itinerary(
             id="flight2",
@@ -49,7 +50,7 @@ async def test_ai_ranker():
                     arr_time=datetime.fromisoformat("2024-12-16T10:35:00"),
                     marketing="Qatar Airways",
                     flight_no="QR701",
-                    duration_min=735
+                    duration_min=735,
                 ),
                 FlightLeg(
                     dep_iata="DOH",
@@ -58,10 +59,10 @@ async def test_ai_ranker():
                     arr_time=datetime.fromisoformat("2024-12-16T15:30:00"),
                     marketing="Qatar Airways",
                     flight_no="QR418",
-                    duration_min=90
-                )
-            ]
-        )
+                    duration_min=90,
+                ),
+            ],
+        ),
     ]
 
     # Create rank request
@@ -72,8 +73,8 @@ async def test_ai_ranker():
             "budget_priority": 0.7,
             "comfort_priority": 0.8,
             "speed_priority": 0.6,
-            "stops_penalty": 0.5
-        }
+            "stops_penalty": 0.5,
+        },
     )
 
     try:
@@ -87,7 +88,9 @@ async def test_ai_ranker():
 
         print("✅ AI ranking completed successfully!")
         print(f"📊 Ranked {len(response.items)} flights")
-        print(f"🏆 Top flight: {response.items[0].flight_id} (score: {response.items[0].score})")
+        print(
+            f"🏆 Top flight: {response.items[0].flight_id} (score: {response.items[0].score})"
+        )
 
         # Print details of top flight
         top_flight = response.items[0]
@@ -102,8 +105,10 @@ async def test_ai_ranker():
     except Exception as e:
         print(f"❌ AI Ranker test failed: {e}")
         import traceback
+
         traceback.print_exc()
         return False
+
 
 if __name__ == "__main__":
     try:

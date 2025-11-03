@@ -1,22 +1,22 @@
 """Flights module exports."""
 
+from .ai_ranker import OpenAIFlightRanker
 from .router import router as flights_router
 from .schemas import (
-    RankRequest,
-    RankResponse,
+    FlightLeg,
+    Itinerary,
+    Locale,
+    Price,
     RankItem,
     RankMeta,
-    Itinerary,
-    FlightLeg,
-    Price,
-    Locale
+    RankRequest,
+    RankResponse,
 )
-from .ai_ranker import OpenAIFlightRanker
 
 __all__ = [
     "flights_router",
     "RankRequest",
-    "RankResponse", 
+    "RankResponse",
     "RankItem",
     "RankMeta",
     "Itinerary",
