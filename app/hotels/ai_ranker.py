@@ -103,10 +103,10 @@ Rules:
         # Build response
         items = []
         ordered_ids = []
-        
+
         # Create a lookup dictionary for hotels by ID
         hotels_by_id = {hotel.id: hotel for hotel in request.hotels}
-        
+
         # Debug: Print hotel links
         print(f"🔍 Debug: Hotels by ID lookup:")
         for hotel_id, hotel in hotels_by_id.items():
@@ -116,7 +116,7 @@ Rules:
             hotel = hotels_by_id.get(rank["id"])
             link_value = hotel.link if hotel else None
             print(f"🔍 Processing ranked hotel {rank['id']}: link = {link_value}")
-            
+
             item = HotelRankItem(
                 id=rank["id"],
                 score=rank["score"],

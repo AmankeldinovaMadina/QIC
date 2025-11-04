@@ -1,7 +1,8 @@
 """Debug test to see full response structure."""
 
-import requests
 import json
+
+import requests
 
 BASE_URL = "http://localhost:8001"
 
@@ -17,14 +18,14 @@ hotels_data = [
         "reviews_count": 100,
         "hotel_class": 4,
         "amenities": ["WiFi"],
-        "link": "https://example.com/hotel1"
+        "link": "https://example.com/hotel1",
     }
 ]
 
 rank_request = {
     "search_id": "test",
     "hotels": hotels_data,
-    "preferences_prompt": "Good hotel"
+    "preferences_prompt": "Good hotel",
 }
 
 response = requests.post(f"{BASE_URL}/api/v1/hotels/rank", json=rank_request)

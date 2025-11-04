@@ -127,7 +127,7 @@ class HotelForRanking(BaseModel):
 
     # Images
     thumbnail: Optional[str] = None
-    
+
     # Booking link
     link: Optional[str] = Field(None, description="Booking URL for the hotel")
 
@@ -218,7 +218,7 @@ class HotelSelectionRequest(BaseModel):
 
     # Images
     thumbnail: Optional[str] = None
-    
+
     # Booking link
     link: Optional[str] = Field(None, description="Booking URL for the hotel")
 

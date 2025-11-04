@@ -188,17 +188,16 @@ Return exactly {len(venues_data)} ranked venues in JSON format following the sch
         """Parse and validate OpenAI response."""
         # Create a lookup dictionary for venues by place_id
         venues_by_id = {venue.place_id: venue for venue in request.venues}
-        
+
         # Parse items and add link from original venue data
         items = []
         for item_data in response["items"]:
             venue = venues_by_id.get(item_data["place_id"])
             item = EntertainmentRankItem(
-                **item_data,
-                link=venue.link if venue else None
+                **item_data, link=venue.link if venue else None
             )
             items.append(item)
-        
+
         meta = EntertainmentRankMeta(**response["meta"])
 
         return EntertainmentRankResponse(
