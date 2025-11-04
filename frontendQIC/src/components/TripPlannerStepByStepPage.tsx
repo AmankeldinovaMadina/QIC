@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { flightsApi, hotelsApi, entertainmentApi } from '../utils/api';
+import { LoadingGame } from './LoadingGame';
 
 interface TripPlannerStepByStepPageProps {
   onBack: () => void;
@@ -86,59 +87,170 @@ export function TripPlannerStepByStepPage({ onBack, tripData, onConfirm, onNotif
       
       // Transform to UI format
       const formattedFlights = flights.map((flight: any) => {
-        const firstLeg = flight.legs?.[0];
-        const lastLeg = flight.legs?.[flight.legs.length - 1];
         const allLegs = flight.legs || [];
+        if (allLegs.length === 0) return null;
         
-        // Check if this is a round trip by seeing if the first leg arrives where last departs
+        const firstLeg = allLegs[0];
+        const lastLeg = allLegs[allLegs.length - 1];
+        
+        // Determine if this is a round trip by checking if we return to origin
+        // Round trip: first departs from origin, last arrives at origin
+        const originIata = firstLeg.dep_iata;
+        const destinationIata = lastLeg.arr_iata;
         const isRoundTrip = firstLeg && lastLeg && 
-          firstLeg.dep_iata === lastLeg.arr_iata && 
-          firstLeg.arr_iata === lastLeg.dep_iata;
+          lastLeg.arr_iata === originIata && 
+          destinationIata !== originIata;
         
-        const depTime = firstLeg ? new Date(firstLeg.dep_time).toLocaleString('en-US', { 
-          hour: 'numeric', 
-          minute: '2-digit',
-          hour12: true 
-        }) : '';
-        const arrTime = lastLeg ? new Date(lastLeg.arr_time).toLocaleString('en-US', { 
-          hour: 'numeric', 
-          minute: '2-digit',
-          hour12: true 
-        }) : '';
+        // Separate outbound and return legs
+        // Outbound: legs that go from origin to destination
+        // Return: legs that go from destination back to origin
+        let outboundLegs: any[] = [];
+        let returnLegs: any[] = [];
         
-        // For round trip, find the return leg
-        let returnDepTime = '';
-        let returnArrTime = '';
-        if (isRoundTrip && allLegs.length > 2) {
-          // Find the first leg that returns (dep from destination)
-          const returnLeg = allLegs.find((leg: any) => 
-            leg.dep_iata === firstLeg.arr_iata && leg.arr_iata === firstLeg.dep_iata
-          );
-          if (returnLeg) {
-            returnDepTime = new Date(returnLeg.dep_time).toLocaleString('en-US', { 
-              hour: 'numeric', 
-              minute: '2-digit',
-              hour12: true 
-            });
-            returnArrTime = new Date(returnLeg.arr_time).toLocaleString('en-US', { 
-              hour: 'numeric', 
-              minute: '2-digit',
-              hour12: true 
-            });
+        if (isRoundTrip) {
+          // Find the transition point where we start returning
+          let foundReturn = false;
+          for (let i = 0; i < allLegs.length; i++) {
+            const leg = allLegs[i];
+            // Check if this leg departs from destination (means we're returning)
+            if (leg.dep_iata === destinationIata && leg.arr_iata === originIata) {
+              foundReturn = true;
+            }
+            if (foundReturn) {
+              returnLegs.push(leg);
+            } else {
+              outboundLegs.push(leg);
+            }
           }
+          
+          // Alternative: if we didn't find return by transition, check all legs
+          if (returnLegs.length === 0) {
+            returnLegs = allLegs.filter((leg: any) => 
+              leg.dep_iata === destinationIata && leg.arr_iata === originIata
+            );
+            outboundLegs = allLegs.filter((leg: any) => 
+              !returnLegs.includes(leg)
+            );
+          }
+        } else {
+          // One-way flight - all legs are outbound
+          outboundLegs = allLegs;
         }
         
-        const durationHrs = Math.floor(flight.total_duration_min / 60);
-        const durationMins = flight.total_duration_min % 60;
-        const durationStr = `${durationHrs}h ${durationMins}m`;
+        // Use outbound legs for main flight info
+        const outboundFirstLeg = outboundLegs[0];
+        const outboundLastLeg = outboundLegs[outboundLegs.length - 1];
         
+        // Extract outbound flight details with dates
+        const outboundDepDate = outboundFirstLeg ? new Date(outboundFirstLeg.dep_time) : null;
+        const outboundArrDate = outboundLastLeg ? new Date(outboundLastLeg.arr_time) : null;
+        
+        const depTime = outboundDepDate ? outboundDepDate.toLocaleString('en-US', { 
+          hour: 'numeric', 
+          minute: '2-digit',
+          hour12: true 
+        }) : '';
+        const arrTime = outboundArrDate ? outboundArrDate.toLocaleString('en-US', { 
+          hour: 'numeric', 
+          minute: '2-digit',
+          hour12: true 
+        }) : '';
+        
+        const depDate = outboundDepDate ? outboundDepDate.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric'
+        }) : '';
+        
+        const arrDate = outboundArrDate ? outboundArrDate.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric'
+        }) : '';
+        
+        // Extract city information for outbound
+        const depCity = outboundFirstLeg?.dep_city || outboundFirstLeg?.dep_name || outboundFirstLeg?.dep_iata || 'Unknown';
+        const arrCity = outboundLastLeg?.arr_city || outboundLastLeg?.arr_name || outboundLastLeg?.arr_iata || 'Unknown';
+        const depAirport = outboundFirstLeg?.dep_iata || '';
+        const arrAirport = outboundLastLeg?.arr_iata || '';
+        
+        // Calculate outbound duration
+        const outboundDurationHrs = Math.floor(flight.total_duration_min / 60);
+        const outboundDurationMins = flight.total_duration_min % 60;
+        const durationStr = `${outboundDurationHrs}h ${outboundDurationMins}m`;
         const stopsStr = flight.stops === 0 
           ? 'Direct' 
           : `${flight.stops} Stop${flight.stops > 1 ? 's' : ''}`;
         
+        // For round trip, extract return flight details
+        let returnDepTime = '';
+        let returnArrTime = '';
+        let returnDepDate = '';
+        let returnArrDate = '';
+        let returnDuration = '';
+        let returnStops = '';
+        let returnAirline = '';
+        let returnDepCity = '';
+        let returnArrCity = '';
+        let returnDepAirport = '';
+        let returnArrAirport = '';
+        
+        if (isRoundTrip && returnLegs.length > 0) {
+          const firstReturnLeg = returnLegs[0];
+          const lastReturnLeg = returnLegs[returnLegs.length - 1];
+          
+          const returnDepDateObj = new Date(firstReturnLeg.dep_time);
+          const returnArrDateObj = new Date(lastReturnLeg.arr_time);
+          
+          returnDepTime = returnDepDateObj.toLocaleString('en-US', { 
+            hour: 'numeric', 
+            minute: '2-digit',
+            hour12: true 
+          });
+          returnArrTime = returnArrDateObj.toLocaleString('en-US', { 
+            hour: 'numeric', 
+            minute: '2-digit',
+            hour12: true 
+          });
+          
+          returnDepDate = returnDepDateObj.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+          });
+          
+          returnArrDate = returnArrDateObj.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+          });
+          
+          // Extract return city information
+          returnDepCity = firstReturnLeg?.dep_city || firstReturnLeg?.dep_name || firstReturnLeg?.dep_iata || 'Unknown';
+          returnArrCity = lastReturnLeg?.arr_city || lastReturnLeg?.arr_name || lastReturnLeg?.arr_iata || 'Unknown';
+          returnDepAirport = firstReturnLeg?.dep_iata || '';
+          returnArrAirport = lastReturnLeg?.arr_iata || '';
+          
+          // Calculate return duration
+          const returnDurationMin = Math.floor(
+            (returnArrDateObj.getTime() - returnDepDateObj.getTime()) / 60000
+          );
+          const returnDurationHrs = Math.floor(returnDurationMin / 60);
+          const returnDurationMins = returnDurationMin % 60;
+          returnDuration = `${returnDurationHrs}h ${returnDurationMins}m`;
+          
+          // Calculate return stops (number of legs - 1)
+          returnStops = returnLegs.length === 1 
+            ? 'Direct' 
+            : `${returnLegs.length - 1} Stop${returnLegs.length - 1 > 1 ? 's' : ''}`;
+          
+          // Get return airline
+          returnAirline = firstReturnLeg?.marketing || 'Unknown';
+        }
+        
         return {
           id: flight.id,
-          airline: firstLeg?.marketing || 'Unknown',
+          airline: outboundFirstLeg?.marketing || 'Unknown',
           price: `$${flight.price?.amount || 0}`,
           time: `${depTime} - ${arrTime}`,
           duration: durationStr,
@@ -147,9 +259,29 @@ export function TripPlannerStepByStepPage({ onBack, tripData, onConfirm, onNotif
           rawFlight: flight, // Keep for ranking
           google_flights_url: flight.google_flights_url,
           isRoundTrip,
-          returnTime: returnDepTime && returnArrTime ? `${returnDepTime} - ${returnArrTime}` : null
+          // Outbound city info
+          depCity,
+          arrCity,
+          depAirport,
+          arrAirport,
+          // Outbound dates
+          depDate,
+          arrDate,
+          // Return flight info
+          returnTime: returnDepTime && returnArrTime ? `${returnDepTime} - ${returnArrTime}` : null,
+          returnDepDate: returnDepDate || null,
+          returnArrDate: returnArrDate || null,
+          returnDuration: returnDuration || null,
+          returnStops: returnStops || null,
+          returnAirline: returnAirline || null,
+          returnDepTime: returnDepTime || null,
+          returnArrTime: returnArrTime || null,
+          returnDepCity: returnDepCity || null,
+          returnArrCity: returnArrCity || null,
+          returnDepAirport: returnDepAirport || null,
+          returnArrAirport: returnArrAirport || null
         };
-      });
+      }).filter((f: any) => f !== null); // Filter out null entries
 
       // Rank flights with AI if we have flights
       if (formattedFlights.length > 0) {
@@ -501,24 +633,81 @@ export function TripPlannerStepByStepPage({ onBack, tripData, onConfirm, onNotif
 
   const totalCost = () => {
     let total = 0;
+    
+    // Get number of travelers (adults)
+    const travelers = tripData?.adults || tripData?.adults_count || 1;
+    
+    // Calculate number of nights from trip dates
+    let nights = 1; // Default to 1 night
+    if (tripData?.start_date || tripData?.startDate) {
+      const startDate = new Date(tripData?.start_date || tripData?.startDate);
+      const endDate = new Date(tripData?.end_date || tripData?.endDate || tripData?.start_date || tripData?.startDate);
+      
+      if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime()) && endDate > startDate) {
+        const timeDiff = endDate.getTime() - startDate.getTime();
+        nights = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
+        if (nights < 1) nights = 1;
+      }
+    }
+    
+    // Flight cost (per person, multiply by travelers)
     if (selectedFlight) {
       const flight = flightOptions.find(f => f.id === selectedFlight);
-      total += parseFloat(flight?.price.replace('$', '') || '0');
+      if (flight?.price) {
+        const flightPriceStr = flight.price.replace(/[^0-9.]/g, '');
+        const flightPrice = parseFloat(flightPriceStr);
+        if (!isNaN(flightPrice) && flightPrice > 0) {
+          // Flight price is per person, multiply by number of travelers
+          total += flightPrice * travelers;
+        }
+      }
     }
+    
+    // Hotel cost (per night, multiply by nights and travelers)
     if (selectedHotel) {
       const hotel = hotelOptions.find(h => h.id === selectedHotel);
-      const nights = 7; // Assume 7 nights
-      const pricePerNight = hotel?.price_per_night || 0;
-      total += pricePerNight * nights;
+      if (hotel?.price_per_night) {
+        const pricePerNight = typeof hotel.price_per_night === 'number' 
+          ? hotel.price_per_night 
+          : parseFloat(String(hotel.price_per_night).replace(/[^0-9.]/g, ''));
+        
+        if (!isNaN(pricePerNight) && pricePerNight > 0) {
+          // Hotel price per night * number of nights * number of travelers
+          total += pricePerNight * nights * travelers;
+        }
+      }
     }
+    
+    // Activities cost (per activity, multiply by travelers)
     selectedActivities.forEach(actId => {
       const activity = activityOptions.find(a => a.id === actId);
-      // Price is now a string like '$80' or empty
       if (activity?.price) {
-        total += parseFloat(activity.price.replace(/\$/, '') || '0');
+        const priceStr = String(activity.price);
+        
+        // Skip if price is "Price varies", "Free", "Contact", etc.
+        const lowerPrice = priceStr.toLowerCase();
+        if (lowerPrice.includes('varies') || 
+            lowerPrice.includes('contact') || 
+            lowerPrice.includes('free') ||
+            lowerPrice === '' ||
+            priceStr.trim() === '') {
+          return; // Skip this activity
+        }
+        
+        // Extract numeric value from price string
+        const priceMatch = priceStr.match(/[\d.]+/);
+        if (priceMatch) {
+          const activityPrice = parseFloat(priceMatch[0]);
+          if (!isNaN(activityPrice) && activityPrice > 0) {
+            // Activity price is per person, multiply by travelers
+            total += activityPrice * travelers;
+          }
+        }
       }
     });
-    return total;
+    
+    // Return 0 if total is NaN or invalid
+    return isNaN(total) || total < 0 ? 0 : Math.round(total * 100) / 100;
   };
 
   return (
@@ -667,9 +856,9 @@ export function TripPlannerStepByStepPage({ onBack, tripData, onConfirm, onNotif
             )}
 
             {isLoadingFlights ? (
-              <div className="text-center py-8">
-                <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                <p className="text-gray-600">Loading flight options...</p>
+              <div className="text-center py-4">
+                <LoadingGame />
+                <p className="text-gray-600 mt-4">Loading flight options...</p>
               </div>
             ) : flightOptions.length === 0 ? (
               <div className="text-center py-8">
@@ -702,16 +891,96 @@ export function TripPlannerStepByStepPage({ onBack, tripData, onConfirm, onNotif
                     </div>
                   )}
                 </div>
-                <div className="space-y-1 text-sm">
-                  <p className="text-gray-600">{flight.time}</p>
-                  {flight.returnTime && (
-                    <p className="text-gray-600 text-xs">Return: {flight.returnTime}</p>
-                  )}
-                  <div className="flex items-center gap-4 text-xs text-gray-500">
-                    <span>{flight.duration}</span>
-                    <span>•</span>
-                    <span>{flight.stops}</span>
+                <div className="space-y-3 text-sm">
+                  {/* Outbound Flight */}
+                  <div className="pb-3 border-b">
+                    <p className="text-xs text-gray-500 mb-2 font-semibold">Outbound Flight</p>
+                    <div className="space-y-2">
+                      {/* Route */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <p className="font-semibold text-gray-900">{flight.depCity}</p>
+                          {flight.depAirport && (
+                            <p className="text-xs text-gray-500">{flight.depAirport}</p>
+                          )}
+                        </div>
+                        <div className="mx-2">
+                          <Plane className="w-4 h-4 text-blue-600" />
+                        </div>
+                        <div className="flex-1 text-right">
+                          <p className="font-semibold text-gray-900">{flight.arrCity}</p>
+                          {flight.arrAirport && (
+                            <p className="text-xs text-gray-500">{flight.arrAirport}</p>
+                          )}
+                        </div>
+                      </div>
+                      {/* Date and Times */}
+                      <div>
+                        {flight.depDate && (
+                          <p className="text-xs text-gray-500 mb-1">{flight.depDate}</p>
+                        )}
+                        <p className="text-gray-700 font-medium">{flight.time}</p>
+                        {flight.arrDate && flight.arrDate !== flight.depDate && (
+                          <p className="text-xs text-gray-500 mt-1">Arrives: {flight.arrDate}</p>
+                        )}
+                      </div>
+                      {/* Details */}
+                      <div className="flex items-center gap-4 text-xs text-gray-500">
+                        <span>{flight.duration}</span>
+                        <span>•</span>
+                        <span>{flight.stops}</span>
+                      </div>
+                    </div>
                   </div>
+                  
+                  {/* Return Flight */}
+                  {flight.isRoundTrip && flight.returnTime && (
+                    <div className="pt-2">
+                      <p className="text-xs text-gray-500 mb-2 font-semibold">Return Flight</p>
+                      <div className="space-y-2">
+                        {/* Route */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <p className="font-semibold text-gray-900">{flight.returnDepCity || 'Unknown'}</p>
+                            {flight.returnDepAirport && (
+                              <p className="text-xs text-gray-500">{flight.returnDepAirport}</p>
+                            )}
+                          </div>
+                          <div className="mx-2">
+                            <Plane className="w-4 h-4 text-blue-600 rotate-180" />
+                          </div>
+                          <div className="flex-1 text-right">
+                            <p className="font-semibold text-gray-900">{flight.returnArrCity || 'Unknown'}</p>
+                            {flight.returnArrAirport && (
+                              <p className="text-xs text-gray-500">{flight.returnArrAirport}</p>
+                            )}
+                          </div>
+                        </div>
+                        {/* Date and Times */}
+                        <div>
+                          {flight.returnDepDate && (
+                            <p className="text-xs text-gray-500 mb-1">{flight.returnDepDate}</p>
+                          )}
+                          <p className="text-gray-700 font-medium">{flight.returnTime}</p>
+                          {flight.returnArrDate && flight.returnArrDate !== flight.returnDepDate && (
+                            <p className="text-xs text-gray-500 mt-1">Arrives: {flight.returnArrDate}</p>
+                          )}
+                        </div>
+                        {/* Details */}
+                        <div className="flex items-center gap-4 text-xs text-gray-500">
+                          {flight.returnDuration && <span>{flight.returnDuration}</span>}
+                          {flight.returnDuration && flight.returnStops && <span>•</span>}
+                          {flight.returnStops && <span>{flight.returnStops}</span>}
+                          {flight.returnAirline && flight.returnAirline !== flight.airline && (
+                            <>
+                              <span>•</span>
+                              <span>{flight.returnAirline}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 {((flight.aiPros && flight.aiPros.length > 0) || (flight.aiCons && flight.aiCons.length > 0) || 
                   (flight.pros && flight.pros.length > 0) || (flight.cons && flight.cons.length > 0)) && (
@@ -801,9 +1070,9 @@ export function TripPlannerStepByStepPage({ onBack, tripData, onConfirm, onNotif
             )}
 
             {isLoadingHotels ? (
-              <div className="text-center py-8">
-                <div className="w-12 h-12 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                <p className="text-gray-600">Searching hotels...</p>
+              <div className="text-center py-4">
+                <LoadingGame />
+                <p className="text-gray-600 mt-4">Searching hotels...</p>
               </div>
             ) : hotelOptions.length === 0 ? (
               <div className="text-center py-8">
@@ -875,9 +1144,9 @@ export function TripPlannerStepByStepPage({ onBack, tripData, onConfirm, onNotif
           <div className="space-y-3">
             <p className="text-sm text-gray-600 mb-4">Choose activities (select multiple)</p>
             {isLoadingActivities ? (
-              <div className="text-center py-8">
-                <div className="w-12 h-12 border-4 border-green-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                <p className="text-gray-600">Finding exciting activities...</p>
+              <div className="text-center py-4">
+                <LoadingGame />
+                <p className="text-gray-600 mt-4">Finding exciting activities...</p>
               </div>
             ) : activityOptions.length === 0 ? (
               <div className="text-center py-8">
@@ -998,7 +1267,11 @@ export function TripPlannerStepByStepPage({ onBack, tripData, onConfirm, onNotif
                         <p className="font-semibold text-sm">{activity.name}</p>
                         <p className="text-xs text-gray-500">{activity.duration}</p>
                       </div>
-                      <p className="font-semibold text-sm text-green-600">{activity.price}</p>
+                      <p className="font-semibold text-sm text-green-600">
+                        {activity.price && activity.price.trim() !== '' 
+                          ? activity.price 
+                          : 'Price varies'}
+                      </p>
                     </div>
                   ) : null;
                 })}
@@ -1007,12 +1280,25 @@ export function TripPlannerStepByStepPage({ onBack, tripData, onConfirm, onNotif
 
             {/* Total Cost */}
             <Card className="p-4 bg-gradient-to-r from-blue-50 to-purple-50">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Estimated Total Cost</p>
-                  <p className="text-xs text-gray-500 mt-1">Per person</p>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-700">Estimated Total Cost</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {tripData?.adults || tripData?.adults_count || 1} {tripData?.adults === 1 || tripData?.adults_count === 1 ? 'person' : 'people'}
+                    </p>
+                  </div>
+                  <p className="text-2xl font-semibold text-blue-600">${totalCost().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                 </div>
-                <p className="text-2xl font-semibold text-blue-600">${totalCost()}</p>
+                {(() => {
+                  const travelers = tripData?.adults || tripData?.adults_count || 1;
+                  const perPerson = travelers > 0 ? totalCost() / travelers : 0;
+                  return travelers > 1 ? (
+                    <p className="text-xs text-gray-500 text-right">
+                      ${perPerson.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} per person
+                    </p>
+                  ) : null;
+                })()}
               </div>
             </Card>
           </div>

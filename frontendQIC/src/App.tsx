@@ -200,36 +200,41 @@ function AppContent() {
       {currentPage === 'trip-history' && (
         <TripHistoryPage 
           onBack={() => handleNavigate('travel')}
-          onViewTrip={(tripId) => handleNavigate('trip-calendar')}
+          onViewTrip={(tripId) => {
+            setSelectedTripId(tripId);
+            handleNavigate('trip-calendar');
+          }}
           onCreateNewTrip={() => handleNavigate('trip-chat')}
           onNotifications={() => handleNavigate('notifications')}
           onTripSummary={handleTripSummary}
         />
       )}
 
-      {currentPage === 'trip-calendar' && (
+      {currentPage === 'trip-calendar' && selectedTripId && (
         <TripCalendarPage 
           onBack={() => handleNavigate('trip-history')}
           onChecklistClick={() => handleNavigate('trip-checklist')}
           onDayClick={(date) => handleNavigate('trip-detail')}
           onImportantNotesClick={() => handleNavigate('important-notes')}
           onNotifications={() => handleNavigate('notifications')}
+          tripId={selectedTripId}
         />
       )}
 
-      {currentPage === 'trip-detail' && (
+      {currentPage === 'trip-detail' && selectedTripId && (
         <TripDetailPage 
-          onBack={() => handleNavigate('travel')}
+          onBack={() => handleNavigate('trip-calendar')}
           onChecklistClick={() => handleNavigate('trip-checklist')}
           onCalendarClick={() => handleNavigate('trip-calendar')}
-          tripDetails={{ tripData, selectedOptions }}
+          tripId={selectedTripId}
         />
       )}
 
-      {currentPage === 'trip-checklist' && (
+      {currentPage === 'trip-checklist' && selectedTripId && (
         <TripChecklistPage 
           onBack={() => handleNavigate('trip-calendar')}
           onNotifications={() => handleNavigate('notifications')}
+          tripId={selectedTripId}
         />
       )}
 
@@ -239,10 +244,11 @@ function AppContent() {
         />
       )}
 
-      {currentPage === 'important-notes' && (
+      {currentPage === 'important-notes' && selectedTripId && (
         <ImportantNotesPage 
           onBack={() => handleNavigate('trip-calendar')}
           onNotifications={() => handleNavigate('notifications')}
+          tripId={selectedTripId}
         />
       )}
 

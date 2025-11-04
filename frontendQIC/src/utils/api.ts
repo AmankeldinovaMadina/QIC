@@ -72,8 +72,9 @@ export const setTokenExpiry = (expiry: string): void => {
 // Generic fetch wrapper with auth
 async function apiRequest<T>(
   endpoint: string,
-  options: RequestInit = {}
-): Promise<T> {
+  options: RequestInit = {},
+  ignore404: boolean = false
+): Promise<T | null> {
   const token = getAccessToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -90,6 +91,11 @@ async function apiRequest<T>(
   });
 
   if (!response.ok) {
+    // If 404 and ignore404 is true, return null instead of throwing
+    if (response.status === 404 && ignore404) {
+      return null;
+    }
+    
     const errorData = await response.json().catch(() => ({
       detail: 'Unknown error occurred',
     }));
@@ -181,11 +187,11 @@ export const tripsApi = {
   },
 
   getTripPlan: async (tripId: string) => {
-    return apiRequest(`/trips/${tripId}/plan`);
+    return apiRequest(`/trips/${tripId}/plan`, {}, true); // Ignore 404 - plan may not exist yet
   },
 
   getTripChecklist: async (tripId: string) => {
-    return apiRequest(`/trips/${tripId}/checklist`);
+    return apiRequest(`/trips/${tripId}/checklist`, {}, true); // Ignore 404 - checklist may not exist yet
   },
 };
 
