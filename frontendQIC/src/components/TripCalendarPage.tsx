@@ -43,10 +43,17 @@ export function TripCalendarPage({ onBack, onChecklistClick, onDayClick, onImpor
         // Generate calendar days - proper calendar grid
         const startDate = new Date(tripData.start_date);
         const endDate = new Date(tripData.end_date);
+        
+        // Validate dates
+        if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+          console.error('Invalid trip dates:', tripData.start_date, tripData.end_date);
+          setCalendarDays([]);
+          return;
+        }
+        
         const days: CalendarDay[] = [];
         
         // Determine which month(s) to show
-        // If trip spans multiple months, show both months
         const startMonth = startDate.getMonth();
         const endMonth = endDate.getMonth();
         const startYear = startDate.getFullYear();
@@ -82,23 +89,36 @@ export function TripCalendarPage({ onBack, onChecklistClick, onDayClick, onImpor
         
         // Add all days from start month to display end
         const currentDate = new Date(monthStart);
+        const tripStartTime = startDate.getTime();
+        const tripEndTime = endDate.getTime();
+        
         while (currentDate <= displayEnd) {
           const date = currentDate.getDate();
           const month = currentDate.getMonth();
           const year = currentDate.getFullYear();
+          const currentTime = currentDate.getTime();
+          
+          // Create a fresh date object for this day
+          const dayDateObj = new Date(year, month, date);
           
           days.push({
             date,
             month,
             year,
-            hasEvent: currentDate >= startDate && currentDate <= endDate,
+            hasEvent: currentTime >= tripStartTime && currentTime <= tripEndTime,
             events: [],
-            dateObj: new Date(currentDate)
+            dateObj: dayDateObj
           });
           
+          // Move to next day
           currentDate.setDate(currentDate.getDate() + 1);
         }
         
+        console.log('Generated calendar days:', days.length, 'days');
+        console.log('First day:', days.find(d => d.date > 0));
+        console.log('Last day:', days.filter(d => d.date > 0).pop());
+        
+        // Always set calendar days first - this ensures the calendar renders even without plan
         setCalendarDays(days);
         
         // Fetch trip plan (may not exist if trip not finalized)
@@ -108,29 +128,43 @@ export function TripCalendarPage({ onBack, onChecklistClick, onDayClick, onImpor
           if (plan && typeof plan === 'object' && 'plan_json' in plan) {
             setTripPlan(plan);
             
-            // Update calendar with events
+            // Update calendar with events (but preserve all days)
             const planJson = (plan as any).plan_json;
             if (planJson?.days) {
-              const updatedDays = days.map(day => {
-                const planDay = planJson.days.find((d: any) => {
-                  const planDate = new Date(d.date);
-                  return planDate.toDateString() === day.dateObj.toDateString();
-                });
+              // Use functional update to ensure we have the latest calendarDays
+              setCalendarDays(prevDays => {
+                if (prevDays.length === 0) return prevDays; // Don't update if no days
                 
-                if (planDay && planDay.events && planDay.events.length > 0) {
-                  return {
-                    ...day,
-                    hasEvent: true,
-                    events: planDay.events.map((e: any) => e.title)
-                  };
-                }
-                return day;
+                return prevDays.map(day => {
+                  // Skip placeholder days
+                  if (day.date === 0 || !day.dateObj || isNaN(day.dateObj.getTime())) {
+                    return day;
+                  }
+                  
+                  const planDay = planJson.days.find((d: any) => {
+                    try {
+                      const planDate = new Date(d.date);
+                      return planDate.toDateString() === day.dateObj.toDateString();
+                    } catch {
+                      return false;
+                    }
+                  });
+                  
+                  if (planDay && planDay.events && planDay.events.length > 0) {
+                    return {
+                      ...day,
+                      hasEvent: true,
+                      events: planDay.events.map((e: any) => e.title || e)
+                    };
+                  }
+                  return day;
+                });
               });
-              setCalendarDays(updatedDays);
             }
           }
         } catch (planError) {
           // Silently ignore - plan may not exist yet
+          // Calendar days are already set above, so calendar will still render
         }
         
         // Fetch checklist for progress (may not exist if trip not finalized)
@@ -313,7 +347,7 @@ export function TripCalendarPage({ onBack, onChecklistClick, onDayClick, onImpor
 
       {/* Google Calendar Section */}
       <div className="px-6 py-6">
-        <Card className="p-4 border-2">
+        <Card className="p-4 border-2 overflow-hidden">
           <h3 className="font-semibold mb-4">Google Calendar</h3>
           
           {/* Calendar Grid */}
@@ -336,9 +370,17 @@ export function TripCalendarPage({ onBack, onChecklistClick, onDayClick, onImpor
                 </div>
               )}
               
-              <div className="mb-4">
+              <div className="mb-4 w-full overflow-hidden">
                 {/* Weekday headers */}
-                <div className="grid grid-cols-7 gap-1 mb-2">
+                <div 
+                  className="mb-2" 
+                  style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: 'repeat(7, 1fr)', 
+                    gap: '4px',
+                    width: '100%'
+                  }}
+                >
                   {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
                     <div key={day} className="text-center text-xs font-semibold text-gray-600 py-2">
                       {day}
@@ -347,49 +389,78 @@ export function TripCalendarPage({ onBack, onChecklistClick, onDayClick, onImpor
                 </div>
                 
                 {/* Calendar grid */}
-                <div className="grid grid-cols-7 gap-1">
-                  {calendarDays.map((day, index) => {
-                    // Skip placeholder days (date === 0)
-                    if (day.date === 0 || !day.dateObj || day.dateObj.getTime() === 0) {
-                      return <div key={`empty-${index}`} className="aspect-square min-h-[44px] rounded-lg" />;
-                    }
-                    
-                    const isSelected = selectedDate !== null && 
-                      selectedDate < calendarDays.length &&
-                      calendarDays[selectedDate]?.dateObj &&
-                      day.dateObj.toDateString() === calendarDays[selectedDate]?.dateObj?.toDateString();
-                    const isTripDay = day.hasEvent;
-                    
-                    return (
+                <div 
+                  className="w-full" 
+                  style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: 'repeat(7, 1fr)', 
+                    gap: '4px',
+                    width: '100%'
+                  }}
+                >
+                  {calendarDays.length === 0 ? (
+                    <div className="col-span-7 text-center py-8 text-gray-500">
+                      No calendar data available
+                    </div>
+                  ) : (
+                    calendarDays.map((day, index) => {
+                      // Skip placeholder days (date === 0 or invalid dateObj)
+                      if (day.date === 0 || !day.dateObj || isNaN(day.dateObj.getTime())) {
+                        return (
+                          <div 
+                            key={`empty-${index}`} 
+                            style={{ 
+                              aspectRatio: '1',
+                              minHeight: '44px',
+                              minWidth: 0
+                            }} 
+                          />
+                        );
+                      }
+                      
+                      const isSelected = selectedDate !== null && 
+                        selectedDate < calendarDays.length &&
+                        calendarDays[selectedDate]?.dateObj &&
+                        day.dateObj.toDateString() === calendarDays[selectedDate]?.dateObj?.toDateString();
+                      const isTripDay = day.hasEvent;
+                      
+                      return (
               <button
-                        key={`${day.date}-${day.month}-${day.year}-${index}`}
+                          key={`${day.date}-${day.month}-${day.year}-${index}`}
                 onClick={() => {
-                          if (isTripDay) {
-                            setSelectedDate(index);
-                            onDayClick(index);
+                            if (isTripDay) {
+                              setSelectedDate(index);
+                              onDayClick(index);
                   }
                 }}
                 className={`
-                          aspect-square rounded-lg flex flex-col items-center justify-center transition-all text-xs min-h-[44px] p-1
-                          ${isTripDay 
-                            ? isSelected
-                              ? 'bg-green-500 text-white shadow-md'
-                              : 'bg-green-100 text-green-700 hover:bg-green-200 border border-green-300'
-                            : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
-                          }
-                          ${isSelected ? 'ring-2 ring-green-500 ring-offset-1' : ''}
-                          ${!isTripDay ? 'cursor-default' : 'cursor-pointer'}
-                        `}
-                      >
-                        <span className="font-semibold text-sm">{day.date}</span>
-                        {day.events && day.events.length > 0 && (
-                          <span className="text-[8px] text-green-600 mt-0.5 font-medium">
-                            {day.events.length}
-                          </span>
-                        )}
+                            rounded-lg flex flex-col items-center justify-center transition-all text-xs p-1
+                            ${isTripDay 
+                              ? isSelected
+                                ? 'bg-green-500 text-white shadow-md'
+                                : 'bg-green-100 text-green-700 hover:bg-green-200 border border-green-300'
+                              : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
+                            }
+                            ${isSelected ? 'ring-2 ring-green-500 ring-offset-1' : ''}
+                            ${!isTripDay ? 'cursor-default' : 'cursor-pointer'}
+                          `}
+                          style={{ 
+                            aspectRatio: '1',
+                            minHeight: '44px',
+                            minWidth: 0,
+                            width: '100%'
+                          }}
+                        >
+                          <span className="font-semibold text-sm">{day.date}</span>
+                          {day.events && day.events.length > 0 && (
+                            <span className="text-[8px] text-green-600 mt-0.5 font-medium">
+                              {day.events.length}
+                            </span>
+                          )}
               </button>
-                    );
-                  })}
+                      );
+                    })
+                  )}
                 </div>
           </div>
 
