@@ -1,8 +1,9 @@
 """Test script for culture guide endpoints with trip creation."""
 
-import requests
 import json
 from datetime import datetime, timedelta
+
+import requests
 
 BASE_URL = "http://localhost:8001"
 

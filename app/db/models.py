@@ -160,6 +160,7 @@ class Trip(Base):
     selected_hotel_pros = Column(JSON, nullable=True)  # Array of pros keywords
     selected_hotel_cons = Column(JSON, nullable=True)  # Array of cons keywords
     selected_hotel_thumbnail = Column(String(1000), nullable=True)
+    selected_hotel_link = Column(String(1000), nullable=True)  # Booking URL
 
     # Selected entertainments information (array of entertainment venues)
     selected_entertainments = Column(
@@ -374,7 +375,9 @@ class CultureGuide(Base):
     __tablename__ = "culture_guides"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    trip_id = Column(String(36), ForeignKey("trips.id"), nullable=False, unique=True, index=True)
+    trip_id = Column(
+        String(36), ForeignKey("trips.id"), nullable=False, unique=True, index=True
+    )
     destination = Column(String(255), nullable=False)
     summary = Column(Text, nullable=False)
     tips_json = Column(JSON, nullable=False)  # Store the array of tips as JSON

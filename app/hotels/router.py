@@ -138,6 +138,7 @@ async def select_hotel_for_trip(
         trip.selected_hotel_pros = req.pros_keywords
         trip.selected_hotel_cons = req.cons_keywords
         trip.selected_hotel_thumbnail = req.thumbnail
+        trip.selected_hotel_link = req.link
 
         # Save to database
         await session.commit()

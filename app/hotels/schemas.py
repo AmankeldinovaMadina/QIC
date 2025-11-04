@@ -127,6 +127,9 @@ class HotelForRanking(BaseModel):
 
     # Images
     thumbnail: Optional[str] = None
+    
+    # Booking link
+    link: Optional[str] = Field(None, description="Booking URL for the hotel")
 
 
 class HotelRankRequest(BaseModel):
@@ -150,6 +153,7 @@ class HotelRankItem(BaseModel):
     pros_keywords: List[str] = Field(default_factory=list, max_items=8)
     cons_keywords: List[str] = Field(default_factory=list, max_items=8)
     tags: Optional[List[str]] = None
+    link: Optional[str] = Field(None, description="Booking URL for the hotel")
 
 
 class HotelRankMeta(BaseModel):
@@ -214,6 +218,9 @@ class HotelSelectionRequest(BaseModel):
 
     # Images
     thumbnail: Optional[str] = None
+    
+    # Booking link
+    link: Optional[str] = Field(None, description="Booking URL for the hotel")
 
 
 class HotelSelectionResponse(BaseModel):
@@ -252,3 +259,4 @@ class SelectedHotelInfo(BaseModel):
     cons_keywords: Optional[List[str]] = None
 
     thumbnail: Optional[str] = None
+    link: Optional[str] = None
