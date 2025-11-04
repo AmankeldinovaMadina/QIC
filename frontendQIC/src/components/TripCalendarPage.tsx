@@ -102,44 +102,56 @@ export function TripCalendarPage({ onBack, onChecklistClick, onDayClick, onImpor
         setCalendarDays(days);
         
         // Fetch trip plan (may not exist if trip not finalized)
-        const plan = await tripsApi.getTripPlan(tripId);
-        if (plan) {
-          setTripPlan(plan);
-          
-          // Update calendar with events
-          if (plan?.plan_json?.days) {
-            const updatedDays = days.map(day => {
-              const planDay = plan.plan_json.days.find((d: any) => {
-                const planDate = new Date(d.date);
-                return planDate.toDateString() === day.dateObj.toDateString();
+        // Note: 404s are expected and handled silently - browser may still log them
+        try {
+          const plan = await tripsApi.getTripPlan(tripId);
+          if (plan && typeof plan === 'object' && 'plan_json' in plan) {
+            setTripPlan(plan);
+            
+            // Update calendar with events
+            const planJson = (plan as any).plan_json;
+            if (planJson?.days) {
+              const updatedDays = days.map(day => {
+                const planDay = planJson.days.find((d: any) => {
+                  const planDate = new Date(d.date);
+                  return planDate.toDateString() === day.dateObj.toDateString();
+                });
+                
+                if (planDay && planDay.events && planDay.events.length > 0) {
+                  return {
+                    ...day,
+                    hasEvent: true,
+                    events: planDay.events.map((e: any) => e.title)
+                  };
+                }
+                return day;
               });
-              
-              if (planDay && planDay.events && planDay.events.length > 0) {
-                return {
-                  ...day,
-                  hasEvent: true,
-                  events: planDay.events.map((e: any) => e.title)
-                };
-              }
-              return day;
-            });
-            setCalendarDays(updatedDays);
+              setCalendarDays(updatedDays);
+            }
           }
+        } catch (planError) {
+          // Silently ignore - plan may not exist yet
         }
         
         // Fetch checklist for progress (may not exist if trip not finalized)
-        const checklist = await tripsApi.getTripChecklist(tripId);
-        if (checklist?.checklist_json) {
-          const allItems: any[] = [
-            ...(checklist.checklist_json.pre_trip || []),
-            ...(checklist.checklist_json.packing || []),
-            ...(checklist.checklist_json.documents || []),
-            ...(checklist.checklist_json.during_trip || [])
-          ];
-          setChecklistProgress({
-            completed: allItems.filter((item: any) => typeof item === 'object' && item.checked).length,
-            total: allItems.length
-          });
+        // Note: 404s are expected and handled silently - browser may still log them
+        try {
+          const checklist = await tripsApi.getTripChecklist(tripId);
+          if (checklist && typeof checklist === 'object' && 'checklist_json' in checklist) {
+            const checklistJson = (checklist as any).checklist_json;
+            const allItems: any[] = [
+              ...(checklistJson.pre_trip || []),
+              ...(checklistJson.packing || []),
+              ...(checklistJson.documents || []),
+              ...(checklistJson.during_trip || [])
+            ];
+            setChecklistProgress({
+              completed: allItems.filter((item: any) => typeof item === 'object' && item.checked).length,
+              total: allItems.length
+            });
+          }
+        } catch (checklistError) {
+          // Silently ignore - checklist may not exist yet
         }
       } catch (error) {
         console.error('Failed to fetch trip data:', error);
@@ -312,6 +324,18 @@ export function TripCalendarPage({ onBack, onChecklistClick, onDayClick, onImpor
             </div>
           ) : (
             <>
+              {/* Month Header */}
+              {trip && calendarDays.length > 0 && (
+                <div className="mb-4 text-center">
+                  <h4 className="text-lg font-semibold text-gray-800">
+                    {new Date(trip.start_date).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                    {new Date(trip.start_date).getMonth() !== new Date(trip.end_date).getMonth() && (
+                      <span> - {new Date(trip.end_date).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</span>
+                    )}
+                  </h4>
+                </div>
+              )}
+              
               <div className="mb-4">
                 {/* Weekday headers */}
                 <div className="grid grid-cols-7 gap-1 mb-2">
@@ -326,11 +350,13 @@ export function TripCalendarPage({ onBack, onChecklistClick, onDayClick, onImpor
                 <div className="grid grid-cols-7 gap-1">
                   {calendarDays.map((day, index) => {
                     // Skip placeholder days (date === 0)
-                    if (day.date === 0) {
-                      return <div key={`empty-${index}`} className="aspect-square" />;
+                    if (day.date === 0 || !day.dateObj || day.dateObj.getTime() === 0) {
+                      return <div key={`empty-${index}`} className="aspect-square min-h-[44px] rounded-lg" />;
                     }
                     
                     const isSelected = selectedDate !== null && 
+                      selectedDate < calendarDays.length &&
+                      calendarDays[selectedDate]?.dateObj &&
                       day.dateObj.toDateString() === calendarDays[selectedDate]?.dateObj?.toDateString();
                     const isTripDay = day.hasEvent;
                     
@@ -344,7 +370,7 @@ export function TripCalendarPage({ onBack, onChecklistClick, onDayClick, onImpor
                   }
                 }}
                 className={`
-                          aspect-square rounded-lg flex flex-col items-center justify-center transition-all text-xs
+                          aspect-square rounded-lg flex flex-col items-center justify-center transition-all text-xs min-h-[44px] p-1
                           ${isTripDay 
                             ? isSelected
                               ? 'bg-green-500 text-white shadow-md'
@@ -357,8 +383,8 @@ export function TripCalendarPage({ onBack, onChecklistClick, onDayClick, onImpor
                       >
                         <span className="font-semibold text-sm">{day.date}</span>
                         {day.events && day.events.length > 0 && (
-                          <span className="text-[8px] text-green-600 mt-0.5">
-                            {day.events.length} event{day.events.length > 1 ? 's' : ''}
+                          <span className="text-[8px] text-green-600 mt-0.5 font-medium">
+                            {day.events.length}
                           </span>
                         )}
               </button>

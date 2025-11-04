@@ -92,16 +92,24 @@ async function apiRequest<T>(
 
   if (!response.ok) {
     // If 404 and ignore404 is true, return null instead of throwing
+    // This prevents errors for expected 404s (e.g., plan/checklist not yet created)
+    // Note: Browser will still log the network request in console, but we won't throw/error
     if (response.status === 404 && ignore404) {
+      // Silently return null for expected 404s (don't log as error)
+      // Try to read response body to avoid "uncaught promise rejection" warnings
+      await response.json().catch(() => null);
       return null;
     }
     
     const errorData = await response.json().catch(() => ({
       detail: 'Unknown error occurred',
     }));
-    console.error('API Error:', response.status, errorData);
-    if (response.status === 422 && Array.isArray(errorData.detail)) {
-      console.error('Validation errors:', JSON.stringify(errorData.detail, null, 2));
+    // Only log as error if it's not an expected 404
+    if (response.status !== 404 || !ignore404) {
+      console.error('API Error:', response.status, errorData);
+      if (response.status === 422 && Array.isArray(errorData.detail)) {
+        console.error('Validation errors:', JSON.stringify(errorData.detail, null, 2));
+      }
     }
     throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
   }

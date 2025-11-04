@@ -65,9 +65,14 @@ export function TripDetailPage({ onBack, onChecklistClick, onCalendarClick, trip
         setTripDays(days);
         
         // Fetch trip plan if available (may not exist if trip not finalized)
-        const plan = await tripsApi.getTripPlan(tripId);
-        if (plan) {
-          setTripPlan(plan);
+        // Note: 404s are expected and handled silently - browser may still log them
+        try {
+          const plan = await tripsApi.getTripPlan(tripId);
+          if (plan) {
+            setTripPlan(plan);
+          }
+        } catch (planError) {
+          // Silently ignore - plan may not exist yet
         }
       } catch (error) {
         console.error('Failed to fetch trip data:', error);

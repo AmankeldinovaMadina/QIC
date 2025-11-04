@@ -8,7 +8,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collap
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
-import { flightsApi, hotelsApi, entertainmentApi } from '../utils/api';
+import { flightsApi, hotelsApi, entertainmentApi, tripsApi } from '../utils/api';
 import { LoadingGame } from './LoadingGame';
 
 interface TripPlannerStepByStepPageProps {
@@ -594,6 +594,20 @@ export function TripPlannerStepByStepPage({ onBack, tripData, onConfirm, onNotif
           trip_id: tripData.id,
           selections
         });
+      }
+
+      // Finalize trip to generate AI plan and checklist
+      // This MUST happen after all selections are saved
+      console.log('Finalizing trip to generate AI plan and checklist...');
+      try {
+        const finalizedTrip = await tripsApi.finalizeTrip(tripData.id);
+        console.log('Trip finalized successfully:', finalizedTrip);
+        console.log('AI plan and checklist have been generated');
+      } catch (finalizeError: any) {
+        console.error('Failed to finalize trip:', finalizeError);
+        // Show error but still proceed - user can manually finalize later
+        const errorMessage = finalizeError?.message || 'Failed to generate trip plan';
+        alert(`Warning: Could not generate trip plan automatically. ${errorMessage}. You can finalize the trip later from the trip details page.`);
       }
 
       // Call parent callback with selection data
@@ -1324,7 +1338,14 @@ export function TripPlannerStepByStepPage({ onBack, tripData, onConfirm, onNotif
               disabled={isSavingSelections}
               className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 h-12"
             >
-              {isSavingSelections ? 'Saving...' : 'Confirm & Create Trip'}
+              {isSavingSelections ? (
+                <span className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  Finalizing Trip & Generating Plan...
+                </span>
+              ) : (
+                'Confirm & Create Trip'
+              )}
             </Button>
           )}
         </div>
