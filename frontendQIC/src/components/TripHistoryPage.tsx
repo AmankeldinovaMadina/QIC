@@ -157,18 +157,15 @@ export function TripHistoryPage({ onBack, onViewTrip, onCreateNewTrip, onNotific
               </div>
             </div>
 
-            {/* Trip Summary Button */}
+            {/* Trip Summary Button - Always Available */}
             <Button
               onClick={(e) => {
                 e.stopPropagation();
-                if (trip.progress === 100) {
-                  onTripSummary(trip.id);
-                }
+                onTripSummary(trip.id);
               }}
-              disabled={trip.progress < 100}
-              className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
             >
-              {trip.progress === 100 ? 'Create Trip Summary' : 'Trip Summary (Complete trip first)'}
+              Post Summary Collage
             </Button>
           </Card>
         ))

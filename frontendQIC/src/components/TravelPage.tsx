@@ -3,7 +3,8 @@ import { Card } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { ImageWithFallback } from './figma/ImageWithFallback';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { tripsApi, TripResponse } from '../utils/api';
 import qicoAvatar from 'figma:asset/df749756eb2f3e1f6a511fd7b1a552bd3aabda73.png';
 
 interface TravelPageProps {
@@ -53,9 +54,41 @@ interface AISuggestedPlan {
 
 export function TravelPage({ onBack, onStartNewTrip, onViewTrip, onViewHistory, onViewPopularPlan, onNotifications }: TravelPageProps) {
   const [likedTrips, setLikedTrips] = useState<number[]>([]);
-  const [hasTrips, setHasTrips] = useState(false); // Set to false to show empty state
+  const [userTrips, setUserTrips] = useState<TripResponse[]>([]);
+  const [isLoadingTrips, setIsLoadingTrips] = useState(true);
   const [showAllAIPlans, setShowAllAIPlans] = useState(false);
   const [showAllPopularPlans, setShowAllPopularPlans] = useState(false);
+
+  useEffect(() => {
+    fetchUserTrips();
+  }, []);
+
+  const fetchUserTrips = async () => {
+    try {
+      setIsLoadingTrips(true);
+      const response = await tripsApi.getTrips();
+      setUserTrips(response.trips || []);
+    } catch (error) {
+      console.error('Failed to fetch trips:', error);
+      setUserTrips([]);
+    } finally {
+      setIsLoadingTrips(false);
+    }
+  };
+
+  const hasTrips = userTrips.length > 0;
+
+  // Loading state
+  if (isLoadingTrips) {
+    return (
+      <div className="max-w-md mx-auto min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading trips...</p>
+        </div>
+      </div>
+    );
+  }
 
   const trips: TripCard[] = [
     {
@@ -228,7 +261,7 @@ export function TravelPage({ onBack, onStartNewTrip, onViewTrip, onViewHistory, 
   };
 
   // Empty state - no trips yet
-  if (!hasTrips) {
+  if (!isLoadingTrips && !hasTrips) {
     return (
       <div className="max-w-md mx-auto min-h-screen bg-gradient-to-b from-blue-50 to-white flex flex-col">
         {/* Header */}
@@ -254,7 +287,7 @@ export function TravelPage({ onBack, onStartNewTrip, onViewTrip, onViewHistory, 
           </div>
         </div>
 
-        {/* Empty State */}
+        {/* Empty State - Only show "No trips planned yet" when there are no trips */}
         <div className="flex-1 flex flex-col items-center justify-center px-6 py-12">
           <div className="w-32 h-32 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center mb-6">
             <svg
@@ -283,13 +316,7 @@ export function TravelPage({ onBack, onStartNewTrip, onViewTrip, onViewHistory, 
               <Plus className="w-5 h-5 mr-2" />
               Plan New Trip with AI
             </Button>
-            <Button
-              onClick={onViewHistory}
-              variant="outline"
-              className="px-8 py-6 h-auto w-full border-2"
-            >
-              View My Trips
-            </Button>
+            {/* "View My Trips" button removed - only show when there are trips */}
           </div>
         </div>
 
@@ -434,7 +461,7 @@ export function TravelPage({ onBack, onStartNewTrip, onViewTrip, onViewHistory, 
     );
   }
 
-  // Has trips - show list
+  // Has trips - show list with "View My Trips" button
   return (
     <div className="max-w-md mx-auto min-h-screen bg-white pb-6">
       {/* Header */}
@@ -447,8 +474,8 @@ export function TravelPage({ onBack, onStartNewTrip, onViewTrip, onViewHistory, 
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="flex-1">
-            <h1 className="text-xl font-semibold">My Trips</h1>
-            <p className="text-sm text-gray-500">Your travel history</p>
+            <h1 className="text-xl font-semibold">Travel</h1>
+            <p className="text-sm text-gray-500">Plan your next adventure</p>
           </div>
           <Button
             onClick={onStartNewTrip}
@@ -458,8 +485,28 @@ export function TravelPage({ onBack, onStartNewTrip, onViewTrip, onViewHistory, 
             <Plus className="w-4 h-4 mr-1" />
             New Trip
           </Button>
+          <button 
+            onClick={() => onNotifications?.()}
+            className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors relative"
+          >
+            <Bell className="w-5 h-5" />
+            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+          </button>
         </div>
       </div>
+
+      {/* View My Trips Button - Only show when there are trips */}
+      {hasTrips && (
+        <div className="px-6 py-4">
+          <Button
+            onClick={onViewHistory}
+            variant="outline"
+            className="w-full border-2 py-6"
+          >
+            View My Trips
+          </Button>
+        </div>
+      )}
 
       {/* Filter Chips */}
       <div className="px-6 py-4 flex gap-2 overflow-x-auto no-scrollbar">

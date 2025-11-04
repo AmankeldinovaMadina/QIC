@@ -60,7 +60,7 @@ export function MainPage({
       </div>
 
       {/* Profile Completion Notice */}
-      {showProfileNotice && !isNoticeDismissed && (
+      {/*showProfileNotice && !isNoticeDismissed && (
         <div className="px-6 pb-4">
           <Alert className="bg-blue-50 border-blue-200 !px-6 py-3">
             <div className="flex gap-3 w-full">
@@ -84,14 +84,14 @@ export function MainPage({
               </div>
               <button
                 onClick={() => setIsNoticeDismissed(true)}
-                className="flex-shrink-0 text-blue-600 hover:text-blue-700"
+                className="text-blue-600 hover:text-blue-700"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
           </Alert>
         </div>
-      )}
+      )}*/}
 
       {/* Hero Section */}
       <div className="px-6 py-6">

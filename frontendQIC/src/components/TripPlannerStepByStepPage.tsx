@@ -363,7 +363,8 @@ export function TripPlannerStepByStepPage({ onBack, tripData, onConfirm, onNotif
           ...original,
           score: item.score,
           aiPros: item.pros_keywords,
-          aiCons: item.cons_keywords
+          aiCons: item.cons_keywords,
+          link: item.link || original?.link || null // Include booking link
         };
       });
       
@@ -423,7 +424,8 @@ export function TripPlannerStepByStepPage({ onBack, tripData, onConfirm, onNotif
         hotel_class: null, // Not provided by SerpApi
         amenities: Array.isArray(hotel.amenities) ? hotel.amenities : [],
         free_cancellation: null, // Not reliably provided
-        thumbnail: firstImage
+        thumbnail: firstImage,
+        link: hotel.google_travel_url || hotel.link || hotel.booking_url || null // Extract booking link from hotel data
       };
     });
   };
@@ -487,7 +489,8 @@ export function TripPlannerStepByStepPage({ onBack, tripData, onConfirm, onNotif
           type: original?.type,
           score: item.score,
           aiPros: item.pros_keywords,
-          aiCons: item.cons_keywords
+          aiCons: item.cons_keywords,
+          link: item.link || original?.link || original?.website || null // Include Google Maps link or website
         };
       });
       
@@ -562,7 +565,8 @@ export function TripPlannerStepByStepPage({ onBack, tripData, onConfirm, onNotif
             hotel_class: hotel.hotel_class,
             amenities: hotel.amenities,
             free_cancellation: hotel.free_cancellation,
-            title: hotel.name
+            title: hotel.name,
+            link: hotel.link || null // Include booking link
           });
         }
       }
@@ -610,8 +614,9 @@ export function TripPlannerStepByStepPage({ onBack, tripData, onConfirm, onNotif
         alert(`Warning: Could not generate trip plan automatically. ${errorMessage}. You can finalize the trip later from the trip details page.`);
       }
 
-      // Call parent callback with selection data
+      // Call parent callback with selection data and trip ID
       onConfirm({
+        tripId: tripData.id, // Include trip ID for navigation
         flight: flightOptions.find(f => f.id === selectedFlight),
         hotel: hotelOptions.find(h => h.id === selectedHotel),
         activities: activityOptions.filter(a => selectedActivities.includes(a.id))
@@ -620,6 +625,7 @@ export function TripPlannerStepByStepPage({ onBack, tripData, onConfirm, onNotif
       console.error('Failed to save selections:', error);
       // Still call onConfirm to proceed
       onConfirm({
+        tripId: tripData.id, // Include trip ID for navigation
         flight: flightOptions.find(f => f.id === selectedFlight),
         hotel: hotelOptions.find(h => h.id === selectedHotel),
         activities: activityOptions.filter(a => selectedActivities.includes(a.id))
@@ -1145,6 +1151,17 @@ export function TripPlannerStepByStepPage({ onBack, tripData, onConfirm, onNotif
                     <p className="font-semibold text-sm text-purple-600">
                       ${hotel.price_per_night}/night
                     </p>
+                    {hotel.link && (
+                      <a
+                        href={hotel.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="mt-2 w-full bg-purple-600 hover:bg-purple-700 text-white text-center text-xs py-2 px-3 rounded-lg transition-colors inline-block"
+                      >
+                        View on Booking Site →
+                      </a>
+                    )}
                   </div>
                 </div>
               </Card>
@@ -1206,7 +1223,21 @@ export function TripPlannerStepByStepPage({ onBack, tripData, onConfirm, onNotif
                         </div>
                       )}
                     </div>
-                    <p className="font-semibold text-sm text-green-600 mt-2">{activity.price}</p>
+                    <div className="flex items-center justify-between mt-2">
+                      <p className="font-semibold text-sm text-green-600">{activity.price}</p>
+                      {activity.link && (
+                        <a
+                          href={activity.link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="bg-green-600 hover:bg-green-700 text-white text-xs py-1.5 px-3 rounded-lg transition-colors inline-flex items-center gap-1"
+                        >
+                          <MapPin className="w-3 h-3" />
+                          View Details
+                        </a>
+                      )}
+                    </div>
                   </div>
                 </div>
               </Card>

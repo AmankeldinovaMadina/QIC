@@ -1,11 +1,10 @@
-import { ArrowLeft, ChevronLeft, ChevronRight, MapPin, Clock, CheckSquare, MessageCircle, Calendar as CalendarIcon, Sparkles } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, MapPin, Clock, CheckSquare, Calendar as CalendarIcon } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { tripsApi, TripResponse } from '../utils/api';
 import { generateICS, downloadICS, CalendarEvent } from '../utils/calendar';
-import qicoAvatar from 'figma:asset/df749756eb2f3e1f6a511fd7b1a552bd3aabda73.png';
 
 interface TripDetailPageProps {
   onBack: () => void;
@@ -31,7 +30,6 @@ interface TripDay {
 
 export function TripDetailPage({ onBack, onChecklistClick, onCalendarClick, tripId }: TripDetailPageProps) {
   const [currentDate, setCurrentDate] = useState(0);
-  const [showQico, setShowQico] = useState(false);
   const [trip, setTrip] = useState<TripResponse | null>(null);
   const [tripPlan, setTripPlan] = useState<any>(null);
   const [tripDays, setTripDays] = useState<TripDay[]>([]);
@@ -388,53 +386,6 @@ export function TripDetailPage({ onBack, onChecklistClick, onCalendarClick, trip
         </div>
       </div>
 
-      {/* Qico AI Assistant */}
-      <div className="sticky bottom-0 bg-white border-t p-4">
-        <div className="max-w-md mx-auto">
-          {!showQico ? (
-            <button
-              onClick={() => setShowQico(true)}
-              className="w-full flex items-center justify-center gap-3 p-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-2xl hover:from-blue-600 hover:to-purple-700 transition-all shadow-lg"
-            >
-              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-sm">
-                <Sparkles className="w-5 h-5" />
-              </div>
-              <div className="text-left">
-                <p className="font-semibold">Need help with your plans?</p>
-                <p className="text-sm text-blue-100">Chat with Qico AI</p>
-              </div>
-              <MessageCircle className="w-5 h-5 ml-auto" />
-            </button>
-          ) : (
-            <Card className="p-4 bg-gradient-to-br from-blue-50 to-purple-50 border-2 border-blue-200">
-              <div className="flex items-start gap-3 mb-3">
-                <img src={qicoAvatar} alt="Qico AI" className="w-10 h-10 rounded-full flex-shrink-0" />
-                <div className="flex-1">
-                  <p className="font-semibold mb-1">Qico AI</p>
-                  <p className="text-sm text-gray-600">
-                    I can help you adjust your schedule, find nearby places, or answer any questions about your trip!
-                  </p>
-                </div>
-                <button
-                  onClick={() => setShowQico(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  ✕
-                </button>
-              </div>
-              <div className="flex gap-2">
-                <input
-                  placeholder="Ask me anything..."
-                  className="flex-1 px-3 py-2 bg-white border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
-                  Send
-                </Button>
-              </div>
-            </Card>
-          )}
-        </div>
-      </div>
     </div>
   );
 }

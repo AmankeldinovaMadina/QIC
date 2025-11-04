@@ -22,6 +22,7 @@ import { ImportantNotesPage } from './components/ImportantNotesPage';
 import { TripGeneratingPage } from './components/TripGeneratingPage';
 import { TripSummaryUploadPage } from './components/TripSummaryUploadPage';
 import { TripSummaryCollagePage } from './components/TripSummaryCollagePage';
+import { AIAssistantButton } from './components/AIAssistantButton';
 
 type PageType = 
   | 'main' 
@@ -88,7 +89,14 @@ function AppContent() {
 
   const handleTripPlannerConfirm = (options: any) => {
     setSelectedOptions(options);
-    setCurrentPage('trip-detail');
+    // Navigate to the newly created trip's calendar page
+    if (options.tripId) {
+      setSelectedTripId(options.tripId);
+      setCurrentPage('trip-calendar');
+    } else {
+      // Fallback to trip detail if trip ID is not available
+      setCurrentPage('trip-detail');
+    }
   };
 
   const handleViewPopularPlan = (planId: number) => {
@@ -266,6 +274,9 @@ function AppContent() {
           tripData={tripSummaryData}
         />
       )}
+
+      {/* Global AI Assistant Button - Show on all pages except login */}
+      {user && <AIAssistantButton />}
     </div>
   );
 }
