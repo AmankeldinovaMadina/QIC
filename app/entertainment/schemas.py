@@ -51,6 +51,7 @@ class GoogleMapsVenue(BaseModel):
     operating_hours: Optional[OperatingHours] = None
     thumbnail: Optional[str] = None
     service_options: Optional[Dict[str, Any]] = None
+    link: Optional[str] = Field(None, description="Google Maps link for the venue")
 
 
 class EntertainmentSearchRequest(BaseModel):
@@ -99,6 +100,7 @@ class EntertainmentRankItem(BaseModel):
     pros_keywords: List[str] = Field(max_items=8)
     cons_keywords: List[str] = Field(max_items=8)
     tags: Optional[List[str]] = None
+    link: Optional[str] = Field(None, description="Google Maps link for the venue")
 
 
 class EntertainmentRankMeta(BaseModel):

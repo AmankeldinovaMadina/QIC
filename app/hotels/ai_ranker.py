@@ -103,8 +103,20 @@ Rules:
         # Build response
         items = []
         ordered_ids = []
+        
+        # Create a lookup dictionary for hotels by ID
+        hotels_by_id = {hotel.id: hotel for hotel in request.hotels}
+        
+        # Debug: Print hotel links
+        print(f"🔍 Debug: Hotels by ID lookup:")
+        for hotel_id, hotel in hotels_by_id.items():
+            print(f"  {hotel_id}: link = {hotel.link}")
 
         for rank in rankings:
+            hotel = hotels_by_id.get(rank["id"])
+            link_value = hotel.link if hotel else None
+            print(f"🔍 Processing ranked hotel {rank['id']}: link = {link_value}")
+            
             item = HotelRankItem(
                 id=rank["id"],
                 score=rank["score"],
@@ -113,6 +125,7 @@ Rules:
                 pros_keywords=rank.get("pros_keywords", [])[:8],
                 cons_keywords=rank.get("cons_keywords", [])[:8],
                 tags=None,
+                link=link_value,
             )
             items.append(item)
             ordered_ids.append(item.id)
@@ -202,6 +215,7 @@ Rules:
                 pros_keywords=ranked["pros"],
                 cons_keywords=ranked["cons"],
                 tags=None,
+                link=hotel.link,
             )
             items.append(item)
             ordered_ids.append(item.id)

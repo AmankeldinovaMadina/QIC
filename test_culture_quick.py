@@ -1,25 +1,22 @@
 """Quick test for culture guide endpoints with known trip ID."""
 
-import requests
 import json
+
+import requests
 
 BASE_URL = "http://localhost:8001"
 TRIP_ID = "8b79a56b-5e46-4aa7-bfd7-7c8db75103c7"  # From create_test_trip.py
 
 print("Testing Culture Guide with Trip ID:", TRIP_ID)
-print("="*60)
+print("=" * 60)
 
 # Test POST
 print("\n1. POST /api/v1/culture/guide")
-print("-"*60)
+print("-" * 60)
 
 response = requests.post(
     f"{BASE_URL}/api/v1/culture/guide",
-    json={
-        "trip_id": TRIP_ID,
-        "destination": "Tokyo, Japan",
-        "language": "en"
-    }
+    json={"trip_id": TRIP_ID, "destination": "Tokyo, Japan", "language": "en"},
 )
 
 print(f"Status: {response.status_code}")
@@ -36,7 +33,7 @@ else:
 
 # Test GET
 print("\n\n2. GET /api/v1/culture/guide/{trip_id}")
-print("-"*60)
+print("-" * 60)
 
 response = requests.get(f"{BASE_URL}/api/v1/culture/guide/{TRIP_ID}")
 
@@ -47,5 +44,5 @@ if response.status_code == 200:
 else:
     print(f"❌ FAILED: {response.text}")
 
-print("\n" + "="*60)
+print("\n" + "=" * 60)
 print("✅ All tests passed!")

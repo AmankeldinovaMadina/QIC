@@ -110,28 +110,26 @@ async def culture_guide(
         HTTPException: 404 if trip not found, 502 if OpenAI API call fails
     """
     # Verify trip exists
-    result = await session.execute(
-        select(Trip).where(Trip.id == req.trip_id)
-    )
+    result = await session.execute(select(Trip).where(Trip.id == req.trip_id))
     trip = result.scalar_one_or_none()
-    
+
     if not trip:
         raise HTTPException(status_code=404, detail="Trip not found")
-    
+
     # Check if culture guide already exists for this trip
     result = await session.execute(
         select(CultureGuideModel).where(CultureGuideModel.trip_id == req.trip_id)
     )
     existing_guide = result.scalar_one_or_none()
-    
+
     if existing_guide:
         # Return existing guide
         return CultureGuideResponse(
             destination=existing_guide.destination,
             summary=existing_guide.summary,
-            tips=[CultureTip(**tip) for tip in existing_guide.tips_json]
+            tips=[CultureTip(**tip) for tip in existing_guide.tips_json],
         )
-    
+
     try:
         # Use Structured Outputs (schema-enforced)
         completion = client.beta.chat.completions.parse(
@@ -153,18 +151,18 @@ async def culture_guide(
         )
 
         parsed: CultureGuide = completion.choices[0].message.parsed  # schema-validated
-        
+
         # Save to database
         culture_guide_db = CultureGuideModel(
             trip_id=req.trip_id,
             destination=parsed.destination,
             summary=parsed.summary,
-            tips_json=[tip.model_dump() for tip in parsed.tips]
+            tips_json=[tip.model_dump() for tip in parsed.tips],
         )
         session.add(culture_guide_db)
         await session.commit()
         await session.refresh(culture_guide_db)
-        
+
         return CultureGuideResponse(**parsed.model_dump())
 
     except Exception as e:
@@ -195,16 +193,16 @@ async def get_culture_guide(
         select(CultureGuideModel).where(CultureGuideModel.trip_id == trip_id)
     )
     culture_guide = result.scalar_one_or_none()
-    
+
     if not culture_guide:
         raise HTTPException(
-            status_code=404, 
-            detail="Culture guide not found for this trip. Please generate one first."
+            status_code=404,
+            detail="Culture guide not found for this trip. Please generate one first.",
         )
-    
+
     # Return the saved guide
     return CultureGuideResponse(
         destination=culture_guide.destination,
         summary=culture_guide.summary,
-        tips=[CultureTip(**tip) for tip in culture_guide.tips_json]
+        tips=[CultureTip(**tip) for tip in culture_guide.tips_json],
     )

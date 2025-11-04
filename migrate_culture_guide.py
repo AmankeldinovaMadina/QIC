@@ -1,7 +1,8 @@
 """Migration script to add culture_guides table."""
 
 import asyncio
-from app.db.database import engine, Base
+
+from app.db.database import Base, engine
 from app.db.models import CultureGuide
 
 
