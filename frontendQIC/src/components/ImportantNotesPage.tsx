@@ -3,14 +3,41 @@ import { Card } from './ui/card';
 import { Badge } from './ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion';
 
+import { useEffect, useState } from 'react';
+import { tripsApi, TripResponse } from '../utils/api';
+
 interface ImportantNotesPageProps {
   onBack: () => void;
   destination?: string;
   onNotifications: () => void;
+  tripId?: string;
 }
 
-export function ImportantNotesPage({ onBack, destination = 'Dubai, UAE', onNotifications }: ImportantNotesPageProps) {
-  // Mock data - in a real app, this would be fetched based on destination
+export function ImportantNotesPage({ onBack, destination, onNotifications, tripId }: ImportantNotesPageProps) {
+  const [trip, setTrip] = useState<TripResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(!!tripId);
+  
+  useEffect(() => {
+    if (tripId) {
+      const fetchTrip = async () => {
+        try {
+          const tripData = await tripsApi.getTrip(tripId);
+          setTrip(tripData);
+        } catch (error) {
+          console.error('Failed to fetch trip:', error);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      fetchTrip();
+    } else {
+      setIsLoading(false);
+    }
+  }, [tripId]);
+  
+  const finalDestination = destination || (trip ? trip.to_city : 'Dubai, UAE');
+  
+  // Mock data - in a real app, this would be fetched based on destination from a culture/visa API
   const importantNotes = {
     visa: {
       title: 'Visa Requirements',

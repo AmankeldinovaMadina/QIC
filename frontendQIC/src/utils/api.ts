@@ -72,8 +72,9 @@ export const setTokenExpiry = (expiry: string): void => {
 // Generic fetch wrapper with auth
 async function apiRequest<T>(
   endpoint: string,
-  options: RequestInit = {}
-): Promise<T> {
+  options: RequestInit = {},
+  ignore404: boolean = false
+): Promise<T | null> {
   const token = getAccessToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -90,12 +91,25 @@ async function apiRequest<T>(
   });
 
   if (!response.ok) {
+    // If 404 and ignore404 is true, return null instead of throwing
+    // This prevents errors for expected 404s (e.g., plan/checklist not yet created)
+    // Note: Browser will still log the network request in console, but we won't throw/error
+    if (response.status === 404 && ignore404) {
+      // Silently return null for expected 404s (don't log as error)
+      // Try to read response body to avoid "uncaught promise rejection" warnings
+      await response.json().catch(() => null);
+      return null;
+    }
+    
     const errorData = await response.json().catch(() => ({
       detail: 'Unknown error occurred',
     }));
-    console.error('API Error:', response.status, errorData);
-    if (response.status === 422 && Array.isArray(errorData.detail)) {
-      console.error('Validation errors:', JSON.stringify(errorData.detail, null, 2));
+    // Only log as error if it's not an expected 404
+    if (response.status !== 404 || !ignore404) {
+      console.error('API Error:', response.status, errorData);
+      if (response.status === 422 && Array.isArray(errorData.detail)) {
+        console.error('Validation errors:', JSON.stringify(errorData.detail, null, 2));
+      }
     }
     throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
   }
@@ -181,16 +195,21 @@ export const tripsApi = {
   },
 
   getTripPlan: async (tripId: string) => {
-    return apiRequest(`/trips/${tripId}/plan`);
+    return apiRequest(`/trips/${tripId}/plan`, {}, true); // Ignore 404 - plan may not exist yet
   },
 
   getTripChecklist: async (tripId: string) => {
-    return apiRequest(`/trips/${tripId}/checklist`);
+    return apiRequest(`/trips/${tripId}/checklist`, {}, true); // Ignore 404 - checklist may not exist yet
   },
 };
 
 // Flights API
 export const flightsApi = {
+  searchFlights: async (query: any) => {
+    const params = new URLSearchParams(query).toString();
+    return apiRequest(`/flights/search?${params}`);
+  },
+
   rankFlights: async (rankingData: any) => {
     return apiRequest('/flights/rank', {
       method: 'POST',

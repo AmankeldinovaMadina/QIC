@@ -35,6 +35,7 @@ class Itinerary(BaseModel):
     emissions_kg: Optional[float] = None
     layovers_min: Optional[int] = None
     legs: List[FlightLeg]
+    google_flights_url: Optional[str] = None
 
 
 class Locale(BaseModel):

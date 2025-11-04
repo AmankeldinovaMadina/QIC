@@ -27,7 +27,7 @@ class FlightSearchService:
         children: int = 0,
         currency: str = "USD",
         hl: str = "en",
-    ) -> List[Itinerary]:
+    ) -> tuple[List[Itinerary], Optional[str]]:
         """
         Search for flights using SerpAPI.
 
@@ -72,11 +72,21 @@ class FlightSearchService:
                 response.raise_for_status()
                 data = response.json()
 
+                # Debug: Check what we got from SerpAPI
+                print(f"📊 SerpAPI Response keys: {list(data.keys())}")
+                if "search_information" in data:
+                    print(f"📋 Search info: {data['search_information']}")
+                if "error" in data:
+                    print(f"⚠️  SerpAPI error: {data['error']}")
+
                 # Parse flights from response
                 flights = []
 
                 # Get best flights
                 if "best_flights" in data:
+                    print(f"✈️  Found {len(data['best_flights'])} best_flights")
+                    for idx, flight_data in enumerate(data["best_flights"][:2]):  # Debug first 2
+                        print(f"📋 Sample flight {idx}: {flight_data.get('flights', [])} legs")
                     for flight_data in data["best_flights"]:
                         itinerary = self._parse_flight(flight_data)
                         if itinerary:
@@ -84,13 +94,19 @@ class FlightSearchService:
 
                 # Get other flights
                 if "other_flights" in data:
+                    print(f"✈️  Found {len(data['other_flights'])} other_flights")
                     for flight_data in data["other_flights"]:
                         itinerary = self._parse_flight(flight_data)
                         if itinerary:
                             flights.append(itinerary)
 
+                print(f"✅ Successfully parsed {len(flights)} itineraries")
+                
+                # Get the Google Flights URL from search metadata
+                google_flights_url = data.get("search_metadata", {}).get("google_flights_url")
+                
                 # Limit to 20 flights
-                return flights[:20]
+                return flights[:20], google_flights_url
 
         except httpx.HTTPError as e:
             print(f"❌ SerpAPI HTTP Error: {e}")
@@ -143,6 +159,12 @@ class FlightSearchService:
 
             if not legs:
                 return None
+
+            print(f"🔍 Parsed {len(legs)} legs for flight")
+            if len(legs) > 0:
+                print(f"   First leg: {legs[0].dep_iata} → {legs[0].arr_iata} ({legs[0].dep_time})")
+            if len(legs) > 1:
+                print(f"   Last leg: {legs[-1].dep_iata} → {legs[-1].arr_iata} ({legs[-1].dep_time})")
 
             # Calculate total duration and layovers
             total_duration = flight_data.get("total_duration", 0)

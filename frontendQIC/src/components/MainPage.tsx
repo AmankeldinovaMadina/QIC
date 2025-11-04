@@ -62,10 +62,10 @@ export function MainPage({
       {/* Profile Completion Notice */}
       {showProfileNotice && !isNoticeDismissed && (
         <div className="px-6 pb-4">
-          <Alert className="bg-blue-50 border-blue-200">
+          <Alert className="bg-blue-50 border-blue-200 !px-6 py-3">
             <div className="flex gap-3 w-full">
               <div className="flex-1">
-                <AlertDescription>
+                <AlertDescription className="col-start-1">
                   <p className="font-semibold text-blue-900 text-sm">
                     Complete your profile
                   </p>

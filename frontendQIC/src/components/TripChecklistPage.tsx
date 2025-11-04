@@ -1,51 +1,95 @@
 import { ArrowLeft, CheckCircle2, Circle, ShoppingBag, Shield, Smartphone, Car as CarIcon, Bell } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
+import { tripsApi } from '../utils/api';
 
 interface TripChecklistPageProps {
   onBack: () => void;
   onNotifications: () => void;
+  tripId: string;
 }
 
 interface ChecklistItem {
-  id: number;
+  id: string;
   text: string;
   checked: boolean;
   category: string;
 }
 
-export function TripChecklistPage({ onBack, onNotifications }: TripChecklistPageProps) {
-  const [checklist, setChecklist] = useState<ChecklistItem[]>([
-    { id: 1, text: 'Passport (valid for 6+ months)', checked: false, category: 'Documents' },
-    { id: 2, text: 'Flight tickets / booking confirmation', checked: false, category: 'Documents' },
-    { id: 3, text: 'Travel insurance', checked: false, category: 'Documents' },
-    { id: 4, text: 'Visa (if required)', checked: false, category: 'Documents' },
-    { id: 5, text: 'Hotel booking confirmation', checked: false, category: 'Documents' },
-    { id: 6, text: 'Local currency / credit cards', checked: false, category: 'Money' },
-    { id: 7, text: 'Power bank & chargers', checked: false, category: 'Electronics' },
-    { id: 8, text: 'Travel adapter', checked: false, category: 'Electronics' },
-    { id: 9, text: 'Phone & camera', checked: false, category: 'Electronics' },
-    { id: 10, text: 'Medications & first aid kit', checked: false, category: 'Health' },
-    { id: 11, text: 'Sunscreen & toiletries', checked: false, category: 'Health' },
-    { id: 12, text: 'Comfortable walking shoes', checked: false, category: 'Clothing' },
-    { id: 13, text: 'Weather-appropriate clothing', checked: false, category: 'Clothing' },
-    { id: 14, text: 'Swimwear', checked: false, category: 'Clothing' }
-  ]);
+export function TripChecklistPage({ onBack, onNotifications, tripId }: TripChecklistPageProps) {
+  const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const toggleItem = (id: number) => {
+  useEffect(() => {
+    const fetchChecklist = async () => {
+      try {
+        setIsLoading(true);
+        const checklistData = await tripsApi.getTripChecklist(tripId);
+        
+        // Checklist may not exist if trip hasn't been finalized
+        if (checklistData?.checklist_json) {
+          const items: ChecklistItem[] = [];
+          
+          // Convert checklist JSON to flat list
+          const categories = {
+            'pre_trip': 'Pre-Trip',
+            'packing': 'Packing',
+            'documents': 'Documents',
+            'during_trip': 'During Trip'
+          };
+          
+          Object.entries(categories).forEach(([key, categoryName]) => {
+            const categoryItems = checklistData.checklist_json[key] || [];
+            categoryItems.forEach((item: string | { text?: string; checked?: boolean }, index: number) => {
+              if (typeof item === 'string') {
+                items.push({
+                  id: `${key}-${index}`,
+                  text: item,
+                  checked: false,
+                  category: categoryName
+                });
+              } else {
+                items.push({
+                  id: `${key}-${index}`,
+                  text: item.text || item.toString(),
+                  checked: item.checked || false,
+                  category: categoryName
+                });
+              }
+            });
+          });
+          
+          setChecklist(items);
+        } else {
+          // No checklist available - trip not finalized yet
+          setChecklist([]);
+        }
+      } catch (error) {
+        console.error('Failed to fetch checklist:', error);
+        setChecklist([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchChecklist();
+  }, [tripId]);
+
+  const toggleItem = (id: string) => {
     setChecklist(prev =>
       prev.map(item =>
         item.id === id ? { ...item, checked: !item.checked } : item
       )
     );
+    // TODO: Save to backend when backend supports updating checklist items
   };
 
-  const categories = ['Documents', 'Money', 'Electronics', 'Health', 'Clothing'];
+  const categories = Array.from(new Set(checklist.map(item => item.category)));
   const completedCount = checklist.filter(item => item.checked).length;
   const totalCount = checklist.length;
-  const progress = Math.round((completedCount / totalCount) * 100);
+  const progress = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
   return (
     <div className="max-w-md mx-auto min-h-screen bg-gradient-to-b from-green-50 to-white pb-6">
@@ -89,15 +133,30 @@ export function TripChecklistPage({ onBack, onNotifications }: TripChecklistPage
 
       {/* Checklist Items */}
       <div className="px-6 py-4">
-        {categories.map((category) => {
-          const categoryItems = checklist.filter(item => item.category === category);
-          if (categoryItems.length === 0) return null;
+        {isLoading ? (
+          <div className="text-center py-8">
+            <div className="w-12 h-12 border-4 border-green-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading checklist...</p>
+          </div>
+        ) : checklist.length === 0 ? (
+          <div className="text-center py-8 px-4">
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+              <p className="text-gray-700 font-semibold mb-2">Checklist Not Available</p>
+              <p className="text-sm text-gray-600 mb-4">
+                The checklist will be generated when you finalize your trip. Complete your trip planning (select flights, hotels, and activities) and finalize the trip to see your personalized checklist.
+              </p>
+            </div>
+          </div>
+        ) : (
+          categories.map((category) => {
+            const categoryItems = checklist.filter(item => item.category === category);
+            if (categoryItems.length === 0) return null;
 
-          return (
-            <div key={category} className="mb-6">
-              <h3 className="font-semibold mb-3 text-gray-700">{category}</h3>
-              <div className="space-y-2">
-                {categoryItems.map((item) => (
+            return (
+              <div key={category} className="mb-6">
+                <h3 className="font-semibold mb-3 text-gray-700">{category}</h3>
+                <div className="space-y-2">
+                  {categoryItems.map((item) => (
                   <Card
                     key={item.id}
                     onClick={() => toggleItem(item.id)}
@@ -118,11 +177,12 @@ export function TripChecklistPage({ onBack, onNotifications }: TripChecklistPage
                       </span>
                     </div>
                   </Card>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
       </div>
 
       {/* Commercial Offers */}
