@@ -67,12 +67,24 @@ An intelligent travel planning platform powered by OpenAI and FastAPI. QICO help
 
 ## Quick Start
 
+### Prerequisites
+- **Python**: 3.9 or higher (tested on 3.9, 3.10, 3.11, 3.12)
+- **pip**: Package installer for Python
+
+### Installation
+
 1. **Install dependencies:**
    ```bash
    python -m venv .venv
    source .venv/bin/activate  # macOS/Linux
    # or: .venv\Scripts\activate  # Windows
    pip install -r requirements.txt
+   ```
+   
+   **Note**: The `requirements.txt` uses flexible version constraints (`>=min,<max`) to ensure compatibility across different Python versions and operating systems. If you encounter any compatibility issues, please run:
+   ```bash
+   pip install --upgrade pip
+   pip install -r requirements.txt --upgrade
    ```
 
 2. **Set up environment variables in `.env`:**
