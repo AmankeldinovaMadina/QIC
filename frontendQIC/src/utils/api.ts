@@ -276,12 +276,31 @@ export const entertainmentApi = {
 };
 
 // Culture API
+export interface CultureTip {
+  category: string;
+  title: string;
+  tip: string;
+  do: string;
+  avoid: string;
+  emoji: string;
+}
+
+export interface CultureGuide {
+  destination: string;
+  summary: string;
+  tips: CultureTip[];
+}
+
 export const cultureApi = {
-  getGuide: async (destination: string) => {
-    return apiRequest('/culture-guide', {
+  getGuide: async (tripId: string, destination: string, language: string = 'en'): Promise<CultureGuide> => {
+    return apiRequest('/culture/guide', {
       method: 'POST',
-      body: JSON.stringify({ destination, language: 'en' }),
-    });
+      body: JSON.stringify({ trip_id: tripId, destination, language }),
+    }) as Promise<CultureGuide>;
+  },
+
+  getSavedGuide: async (tripId: string): Promise<CultureGuide | null> => {
+    return apiRequest<CultureGuide>(`/culture/guide/${tripId}`, {}, true) as Promise<CultureGuide | null>;
   },
 };
 

@@ -4,7 +4,7 @@ import { Badge } from './ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion';
 
 import { useEffect, useState } from 'react';
-import { tripsApi, TripResponse } from '../utils/api';
+import { tripsApi, TripResponse, cultureApi, CultureGuide, CultureTip } from '../utils/api';
 
 interface ImportantNotesPageProps {
   onBack: () => void;
@@ -15,7 +15,9 @@ interface ImportantNotesPageProps {
 
 export function ImportantNotesPage({ onBack, destination, onNotifications, tripId }: ImportantNotesPageProps) {
   const [trip, setTrip] = useState<TripResponse | null>(null);
+  const [cultureGuide, setCultureGuide] = useState<CultureGuide | null>(null);
   const [isLoading, setIsLoading] = useState(!!tripId);
+  const [isLoadingGuide, setIsLoadingGuide] = useState(false);
   
   useEffect(() => {
     if (tripId) {
@@ -34,135 +36,81 @@ export function ImportantNotesPage({ onBack, destination, onNotifications, tripI
       setIsLoading(false);
     }
   }, [tripId]);
+
+  useEffect(() => {
+    const fetchCultureGuide = async () => {
+      if (!tripId || !trip) return;
+      
+      setIsLoadingGuide(true);
+      try {
+        // Try to get saved guide first
+        let guide = await cultureApi.getSavedGuide(tripId);
+        
+        // If no saved guide, generate a new one
+        if (!guide) {
+          guide = await cultureApi.getGuide(tripId, trip.to_city, 'en');
+        }
+        
+        setCultureGuide(guide);
+      } catch (error) {
+        console.error('Failed to fetch culture guide:', error);
+      } finally {
+        setIsLoadingGuide(false);
+      }
+    };
+
+    if (tripId && trip) {
+      fetchCultureGuide();
+    }
+  }, [tripId, trip]);
   
   const finalDestination = destination || (trip ? trip.to_city : 'Dubai, UAE');
-  
-  // Mock data - in a real app, this would be fetched based on destination from a culture/visa API
-  const importantNotes = {
-    visa: {
-      title: 'Visa Requirements',
-      icon: <FileText className="w-5 h-5" />,
-      color: 'blue',
-      items: [
-        {
-          title: 'Tourist Visa',
-          content: 'Most nationalities can obtain a visa on arrival for 30-90 days. Check with UAE embassy for your specific country requirements.'
-        },
-        {
-          title: 'Passport Validity',
-          content: 'Your passport must be valid for at least 6 months from your entry date.'
-        },
-        {
-          title: 'Visa Fees',
-          content: 'Visa on arrival costs approximately AED 100-300 (USD 27-82) depending on duration.'
-        }
-      ]
-    },
-    clothing: {
-      title: 'Dress Code & Clothing',
-      icon: <Shirt className="w-5 h-5" />,
-      color: 'purple',
-      items: [
-        {
-          title: 'General Guidelines',
-          content: 'Dubai is relatively liberal, but modest clothing is recommended. Cover shoulders and knees in public areas, especially government buildings and mosques.'
-        },
-        {
-          title: 'Beach & Pool',
-          content: 'Swimwear is acceptable at beaches and hotel pools, but cover up when leaving these areas.'
-        },
-        {
-          title: 'What to Pack',
-          content: 'Light, breathable fabrics for hot weather. Bring a light jacket for heavily air-conditioned malls and restaurants. Comfortable walking shoes essential.'
-        },
-        {
-          title: 'Religious Sites',
-          content: 'Women should wear an abaya (provided at entrance) and headscarf when visiting mosques. Men should wear long pants and shirts with sleeves.'
-        }
-      ]
-    },
-    culture: {
-      title: 'Culture & Customs',
-      icon: <Globe className="w-5 h-5" />,
-      color: 'green',
-      items: [
-        {
-          title: 'Ramadan',
-          content: 'During Ramadan, eating, drinking, and smoking in public during daylight hours is prohibited. Many restaurants close during the day.'
-        },
-        {
-          title: 'Public Behavior',
-          content: 'Public displays of affection should be minimal. Avoid excessive physical contact in public.'
-        },
-        {
-          title: 'Photography',
-          content: 'Always ask permission before photographing people, especially women. Avoid photographing government buildings and military installations.'
-        },
-        {
-          title: 'Greetings',
-          content: 'A handshake is common for men. Women may choose to shake hands or simply nod. Wait for a woman to extend her hand first.'
-        },
-        {
-          title: 'Language',
-          content: 'Arabic is the official language, but English is widely spoken in tourist areas, hotels, and restaurants.'
-        }
-      ]
-    },
-    rules: {
-      title: 'Important Rules & Laws',
-      icon: <AlertTriangle className="w-5 h-5" />,
-      color: 'red',
-      items: [
-        {
-          title: 'Alcohol',
-          content: 'Alcohol is only served in licensed hotels and clubs. Public intoxication is illegal and can result in arrest. Drinking and driving has zero tolerance.'
-        },
-        {
-          title: 'Drugs',
-          content: 'UAE has extremely strict drug laws. Even trace amounts can lead to imprisonment. This includes some prescription medications - check before traveling.'
-        },
-        {
-          title: 'Public Conduct',
-          content: 'Swearing, rude gestures, and offensive behavior can result in fines or imprisonment. Be respectful at all times.'
-        },
-        {
-          title: 'Friday',
-          content: 'Friday is the holy day. Many businesses are closed or have reduced hours. Government offices are typically closed Thursday-Friday.'
-        },
-        {
-          title: 'Social Media',
-          content: 'Be careful what you post on social media. Defamatory comments about UAE or its leaders can result in legal action.'
-        }
-      ]
-    },
-    practical: {
-      title: 'Practical Information',
-      icon: <Info className="w-5 h-5" />,
-      color: 'orange',
-      items: [
-        {
-          title: 'Currency',
-          content: 'UAE Dirham (AED). 1 USD ≈ 3.67 AED. Credit cards widely accepted. ATMs available everywhere.'
-        },
-        {
-          title: 'Tipping',
-          content: '10-15% is customary in restaurants. Round up taxi fares. Tip hotel staff AED 5-10 per service.'
-        },
-        {
-          title: 'Emergency Numbers',
-          content: 'Police: 999, Ambulance: 998, Fire: 997, Tourist Police: 800 4438'
-        },
-        {
-          title: 'Weather',
-          content: 'Best time: November-March (20-30°C). Summer (May-September) is extremely hot (40-45°C). Always carry water.'
-        },
-        {
-          title: 'Internet & SIM',
-          content: 'Free WiFi in most hotels and malls. Tourist SIM cards available at airport (Etisalat, du).'
-        }
-      ]
-    }
+
+  // Organize tips by category
+  const organizeTipsByCategory = (tips: CultureTip[]) => {
+    const categories: Record<string, CultureTip[]> = {};
+    
+    tips.forEach(tip => {
+      if (!categories[tip.category]) {
+        categories[tip.category] = [];
+      }
+      categories[tip.category].push(tip);
+    });
+    
+    return categories;
   };
+
+  // Get category display name
+  const getCategoryDisplayName = (category: string): string => {
+    const categoryNames: Record<string, string> = {
+      'greeting_etiquette': 'Greeting & Etiquette',
+      'dress_code': 'Dress Code',
+      'behavioral_norms': 'Behavioral Norms',
+      'dining_etiquette': 'Dining Etiquette',
+      'communication': 'Communication',
+      'social_customs': 'Social Customs',
+      'religious_practices': 'Religious Practices',
+      'business_etiquette': 'Business Etiquette',
+    };
+    return categoryNames[category] || category.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  };
+
+  // Get category icon and color
+  const getCategoryStyle = (category: string) => {
+    const styles: Record<string, { icon: JSX.Element; color: string }> = {
+      'greeting_etiquette': { icon: <Globe className="w-5 h-5" />, color: 'blue' },
+      'dress_code': { icon: <Shirt className="w-5 h-5" />, color: 'purple' },
+      'behavioral_norms': { icon: <AlertTriangle className="w-5 h-5" />, color: 'green' },
+      'dining_etiquette': { icon: <Info className="w-5 h-5" />, color: 'orange' },
+      'communication': { icon: <FileText className="w-5 h-5" />, color: 'blue' },
+      'social_customs': { icon: <Globe className="w-5 h-5" />, color: 'green' },
+      'religious_practices': { icon: <AlertTriangle className="w-5 h-5" />, color: 'red' },
+      'business_etiquette': { icon: <Plane className="w-5 h-5" />, color: 'purple' },
+    };
+    return styles[category] || { icon: <Info className="w-5 h-5" />, color: 'gray' };
+  };
+  
+  const importantNotes = cultureGuide ? organizeTipsByCategory(cultureGuide.tips) : {};
 
   const getColorClasses = (color: string) => {
     switch (color) {
@@ -194,7 +142,7 @@ export function ImportantNotesPage({ onBack, destination, onNotifications, tripI
           </button>
           <div className="flex-1">
             <h1 className="text-lg sm:text-xl font-semibold">Important Notes</h1>
-            <p className="text-xs sm:text-sm text-gray-500">{destination}</p>
+            <p className="text-xs sm:text-sm text-gray-500">{finalDestination}</p>
           </div>
           <button 
             onClick={onNotifications}
@@ -221,128 +169,97 @@ export function ImportantNotesPage({ onBack, destination, onNotifications, tripI
         </Card>
       </div>
 
-      {/* Content Sections */}
-      <div className="px-4 sm:px-6 pb-6 space-y-4">
-        {/* Visa Requirements */}
-        <Card className={`p-4 border-2 ${getColorClasses(importantNotes.visa.color).border}`}>
-          <div className="flex items-center gap-3 mb-4">
-            <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg ${getColorClasses(importantNotes.visa.color).bg} flex items-center justify-center`}>
-              <div className={getColorClasses(importantNotes.visa.color).text}>
-                {importantNotes.visa.icon}
+      {/* Summary Section */}
+      {cultureGuide?.summary && (
+        <div className="px-4 sm:px-6 py-4">
+          <Card className="p-4 bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200">
+            <div className="flex gap-3">
+              <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold text-sm text-blue-900 mb-2">Cultural Overview</p>
+                <p className="text-xs sm:text-sm text-blue-700">
+                  {cultureGuide.summary}
+                </p>
               </div>
             </div>
-            <h2 className="font-semibold text-base sm:text-lg">{importantNotes.visa.title}</h2>
-          </div>
-          <Accordion type="single" collapsible className="space-y-2">
-            {importantNotes.visa.items.map((item, index) => (
-              <AccordionItem key={index} value={`visa-${index}`} className="border rounded-lg px-3">
-                <AccordionTrigger className="text-sm hover:no-underline py-3">
-                  {item.title}
-                </AccordionTrigger>
-                <AccordionContent className="text-xs sm:text-sm text-gray-600 pb-3">
-                  {item.content}
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
-        </Card>
+          </Card>
+        </div>
+      )}
 
-        {/* Clothing */}
-        <Card className={`p-4 border-2 ${getColorClasses(importantNotes.clothing.color).border}`}>
-          <div className="flex items-center gap-3 mb-4">
-            <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg ${getColorClasses(importantNotes.clothing.color).bg} flex items-center justify-center`}>
-              <div className={getColorClasses(importantNotes.clothing.color).text}>
-                {importantNotes.clothing.icon}
-              </div>
-            </div>
-            <h2 className="font-semibold text-base sm:text-lg">{importantNotes.clothing.title}</h2>
+      {/* Loading State */}
+      {isLoadingGuide && (
+        <div className="px-4 sm:px-6 py-8 flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-12 h-12 border-4 border-orange-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading cultural information...</p>
           </div>
-          <Accordion type="single" collapsible className="space-y-2">
-            {importantNotes.clothing.items.map((item, index) => (
-              <AccordionItem key={index} value={`clothing-${index}`} className="border rounded-lg px-3">
-                <AccordionTrigger className="text-sm hover:no-underline py-3">
-                  {item.title}
-                </AccordionTrigger>
-                <AccordionContent className="text-xs sm:text-sm text-gray-600 pb-3">
-                  {item.content}
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
-        </Card>
+        </div>
+      )}
 
-        {/* Culture & Customs */}
-        <Card className={`p-4 border-2 ${getColorClasses(importantNotes.culture.color).border}`}>
-          <div className="flex items-center gap-3 mb-4">
-            <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg ${getColorClasses(importantNotes.culture.color).bg} flex items-center justify-center`}>
-              <div className={getColorClasses(importantNotes.culture.color).text}>
-                {importantNotes.culture.icon}
-              </div>
-            </div>
-            <h2 className="font-semibold text-base sm:text-lg">{importantNotes.culture.title}</h2>
-          </div>
-          <Accordion type="single" collapsible className="space-y-2">
-            {importantNotes.culture.items.map((item, index) => (
-              <AccordionItem key={index} value={`culture-${index}`} className="border rounded-lg px-3">
-                <AccordionTrigger className="text-sm hover:no-underline py-3">
-                  {item.title}
-                </AccordionTrigger>
-                <AccordionContent className="text-xs sm:text-sm text-gray-600 pb-3">
-                  {item.content}
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
-        </Card>
+      {/* Content Sections - Organized by Category */}
+      {!isLoadingGuide && Object.keys(importantNotes).length > 0 && (
+        <div className="px-4 sm:px-6 pb-6 space-y-4">
+          {Object.entries(importantNotes).map(([category, tips]) => {
+            const categoryStyle = getCategoryStyle(category);
+            const colorClasses = getColorClasses(categoryStyle.color);
+            
+            return (
+              <Card key={category} className={`p-4 border-2 ${colorClasses.border}`}>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg ${colorClasses.bg} flex items-center justify-center`}>
+                    <div className={colorClasses.text}>
+                      {categoryStyle.icon}
+                    </div>
+                  </div>
+                  <h2 className="font-semibold text-base sm:text-lg">
+                    {getCategoryDisplayName(category)}
+                  </h2>
+                </div>
+                <Accordion type="single" collapsible className="space-y-2">
+                  {tips.map((tip, index) => (
+                    <AccordionItem key={index} value={`${category}-${index}`} className="border rounded-lg px-3">
+                      <AccordionTrigger className="text-sm hover:no-underline py-3">
+                        <div className="flex items-center gap-2">
+                          {tip.emoji && <span className="text-base">{tip.emoji}</span>}
+                          <span>{tip.title}</span>
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="text-xs sm:text-sm text-gray-600 pb-3 space-y-2">
+                        <p>{tip.tip}</p>
+                        {tip.do && (
+                          <div className="mt-2 pt-2 border-t border-gray-200">
+                            <p className="font-semibold text-green-700 mb-1">✓ Do:</p>
+                            <p className="text-gray-700">{tip.do}</p>
+                          </div>
+                        )}
+                        {tip.avoid && (
+                          <div className="mt-2 pt-2 border-t border-gray-200">
+                            <p className="font-semibold text-red-700 mb-1">✗ Avoid:</p>
+                            <p className="text-gray-700">{tip.avoid}</p>
+                          </div>
+                        )}
+                      </AccordionContent>
+                    </AccordionItem>
+                  ))}
+                </Accordion>
+              </Card>
+            );
+          })}
+        </div>
+      )}
 
-        {/* Rules & Laws */}
-        <Card className={`p-4 border-2 ${getColorClasses(importantNotes.rules.color).border}`}>
-          <div className="flex items-center gap-3 mb-4">
-            <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg ${getColorClasses(importantNotes.rules.color).bg} flex items-center justify-center`}>
-              <div className={getColorClasses(importantNotes.rules.color).text}>
-                {importantNotes.rules.icon}
-              </div>
-            </div>
-            <h2 className="font-semibold text-base sm:text-lg">{importantNotes.rules.title}</h2>
+      {/* Empty State */}
+      {!isLoadingGuide && Object.keys(importantNotes).length === 0 && (
+        <div className="px-4 sm:px-6 py-12 flex flex-col items-center justify-center">
+          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+            <Info className="w-8 h-8 text-gray-400" />
           </div>
-          <Accordion type="single" collapsible className="space-y-2">
-            {importantNotes.rules.items.map((item, index) => (
-              <AccordionItem key={index} value={`rules-${index}`} className="border rounded-lg px-3">
-                <AccordionTrigger className="text-sm hover:no-underline py-3">
-                  {item.title}
-                </AccordionTrigger>
-                <AccordionContent className="text-xs sm:text-sm text-gray-600 pb-3">
-                  {item.content}
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
-        </Card>
-
-        {/* Practical Information */}
-        <Card className={`p-4 border-2 ${getColorClasses(importantNotes.practical.color).border}`}>
-          <div className="flex items-center gap-3 mb-4">
-            <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg ${getColorClasses(importantNotes.practical.color).bg} flex items-center justify-center`}>
-              <div className={getColorClasses(importantNotes.practical.color).text}>
-                {importantNotes.practical.icon}
-              </div>
-            </div>
-            <h2 className="font-semibold text-base sm:text-lg">{importantNotes.practical.title}</h2>
-          </div>
-          <Accordion type="single" collapsible className="space-y-2">
-            {importantNotes.practical.items.map((item, index) => (
-              <AccordionItem key={index} value={`practical-${index}`} className="border rounded-lg px-3">
-                <AccordionTrigger className="text-sm hover:no-underline py-3">
-                  {item.title}
-                </AccordionTrigger>
-                <AccordionContent className="text-xs sm:text-sm text-gray-600 pb-3">
-                  {item.content}
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
-        </Card>
-      </div>
+          <h3 className="font-semibold text-base mb-2">No cultural information available</h3>
+          <p className="text-xs sm:text-sm text-gray-500 text-center">
+            Cultural guide will be generated when you finalize your trip.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

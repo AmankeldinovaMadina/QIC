@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { FavouritesProvider, useFavourites } from './contexts/FavouritesContext';
+import { NotificationProvider } from './contexts/NotificationContext';
 import { LoginPage } from './components/LoginPage';
 import { MainPage } from './components/MainPage';
 import { ProfilePage } from './components/ProfilePage';
@@ -23,6 +24,7 @@ import { TripGeneratingPage } from './components/TripGeneratingPage';
 import { TripSummaryUploadPage } from './components/TripSummaryUploadPage';
 import { TripSummaryCollagePage } from './components/TripSummaryCollagePage';
 import { AIAssistantButton } from './components/AIAssistantButton';
+import { NotificationPopup } from './components/NotificationPopup';
 
 type PageType = 
   | 'main' 
@@ -277,6 +279,9 @@ function AppContent() {
 
       {/* Global AI Assistant Button - Show on all pages except login */}
       {user && <AIAssistantButton />}
+      
+      {/* Notification Popup - Show on all pages when logged in */}
+      {user && <NotificationPopup />}
     </div>
   );
 }
@@ -285,7 +290,9 @@ export default function App() {
   return (
     <AuthProvider>
       <FavouritesProvider>
-        <AppContent />
+        <NotificationProvider>
+          <AppContent />
+        </NotificationProvider>
       </FavouritesProvider>
     </AuthProvider>
   );

@@ -1,89 +1,14 @@
-import { ArrowLeft, Bell, Calendar, Heart, MessageCircle, Plane, MapPin, Clock } from 'lucide-react';
+import { ArrowLeft, Bell, Calendar, Heart, MessageCircle, Plane, MapPin, Clock, Ticket } from 'lucide-react';
 import { Card } from './ui/card';
 import { Badge } from './ui/badge';
+import { useNotifications, Notification } from '../contexts/NotificationContext';
 
 interface NotificationsPageProps {
   onBack: () => void;
 }
 
-interface Notification {
-  id: number;
-  type: 'trip' | 'like' | 'comment' | 'system' | 'reminder';
-  title: string;
-  message: string;
-  time: string;
-  isRead: boolean;
-  icon?: string;
-}
-
 export function NotificationsPage({ onBack }: NotificationsPageProps) {
-  // Mock notifications data
-  const notifications: Notification[] = [
-    {
-      id: 1,
-      type: 'trip',
-      title: 'Trip Reminder',
-      message: 'Your trip to Dubai starts in 3 days! Don\'t forget to complete your checklist.',
-      time: '2 hours ago',
-      isRead: false
-    },
-    {
-      id: 2,
-      type: 'like',
-      title: 'New Like',
-      message: 'Sarah Chen liked your Tokyo Adventure trip plan.',
-      time: '5 hours ago',
-      isRead: false
-    },
-    {
-      id: 3,
-      type: 'comment',
-      title: 'New Comment',
-      message: 'Mike Johnson commented on your Paris travel plan: "Great itinerary!"',
-      time: '1 day ago',
-      isRead: true
-    },
-    {
-      id: 4,
-      type: 'system',
-      title: 'Profile Update',
-      message: 'Complete your profile to get personalized travel recommendations.',
-      time: '2 days ago',
-      isRead: true
-    },
-    {
-      id: 5,
-      type: 'reminder',
-      title: 'Pre-trip Checklist',
-      message: 'You have 5 pending items in your Dubai trip checklist.',
-      time: '2 days ago',
-      isRead: true
-    },
-    {
-      id: 6,
-      type: 'trip',
-      title: 'Flight Booking',
-      message: 'Don\'t forget to book your flight for the Tokyo trip!',
-      time: '3 days ago',
-      isRead: true
-    },
-    {
-      id: 7,
-      type: 'like',
-      title: 'Popular Plan',
-      message: 'Your "Tokyo Adventure" plan reached 100 likes!',
-      time: '4 days ago',
-      isRead: true
-    },
-    {
-      id: 8,
-      type: 'system',
-      title: 'New Feature',
-      message: 'Check out our new AI-powered trip planner with Qico assistant.',
-      time: '5 days ago',
-      isRead: true
-    }
-  ];
+  const { notifications, markAsRead, markAllAsRead, unreadCount } = useNotifications();
 
   const getNotificationIcon = (type: Notification['type']) => {
     switch (type) {
@@ -97,6 +22,8 @@ export function NotificationsPage({ onBack }: NotificationsPageProps) {
         return <Clock className="w-5 h-5 text-orange-600" />;
       case 'system':
         return <Bell className="w-5 h-5 text-purple-600" />;
+      case 'event':
+        return <Ticket className="w-5 h-5 text-blue-600" />;
       default:
         return <Bell className="w-5 h-5 text-gray-600" />;
     }
@@ -114,12 +41,12 @@ export function NotificationsPage({ onBack }: NotificationsPageProps) {
         return 'bg-orange-100';
       case 'system':
         return 'bg-purple-100';
+      case 'event':
+        return 'bg-blue-100';
       default:
         return 'bg-gray-100';
     }
   };
-
-  const unreadCount = notifications.filter(n => !n.isRead).length;
 
   return (
     <div className="max-w-md mx-auto min-h-screen bg-gradient-to-b from-purple-50 to-white">
@@ -138,7 +65,10 @@ export function NotificationsPage({ onBack }: NotificationsPageProps) {
               <p className="text-xs sm:text-sm text-gray-500">{unreadCount} unread</p>
             )}
           </div>
-          <button className="text-xs sm:text-sm text-blue-600 hover:text-blue-700 font-semibold">
+          <button 
+            onClick={markAllAsRead}
+            className="text-xs sm:text-sm text-blue-600 hover:text-blue-700 font-semibold"
+          >
             Mark all read
           </button>
         </div>
@@ -149,6 +79,7 @@ export function NotificationsPage({ onBack }: NotificationsPageProps) {
         {notifications.map((notification) => (
           <Card
             key={notification.id}
+            onClick={() => markAsRead(notification.id)}
             className={`p-3 sm:p-4 cursor-pointer hover:shadow-md transition-shadow ${
               !notification.isRead ? 'bg-blue-50/50 border-blue-200' : 'bg-white'
             }`}
